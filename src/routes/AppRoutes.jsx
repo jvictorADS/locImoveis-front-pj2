@@ -4,11 +4,6 @@ import { Login } from '../pages/Login';
 import { Cadastro } from '../pages/Cadastro';
 import { MenuPrincipal, Dashboard, SectionPage } from '../pages/MenuPrincipal';
 
-function PrivateRoute({ children }) {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
-}
-
 export function AppRoutes() {
   const { isAuthenticated } = useAuth();
 
@@ -19,7 +14,7 @@ export function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/cadastro" element={<Cadastro />} />
 
-      <Route element={<PrivateRoute><MenuPrincipal /></PrivateRoute>}>
+      <Route element={<MenuPrincipal />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/imoveis" element={<SectionPage section="imoveis" />} />
         <Route path="/contratos" element={<SectionPage section="contratos" />} />
