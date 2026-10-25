@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  Loader2, 
-  MapPin, 
-  Home, 
-  X, 
-  MoreVertical, 
-  Pencil, 
-  Trash2, 
-  CheckCircle2, 
-  XCircle 
+import {
+  Building2,
+  Loader2,
+  MapPin,
+  Home,
+  X,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -20,17 +18,16 @@ export function Imoveis() {
 
   const [imoveis, setImoveis] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Estado para controlar qual menu de 3 pontinhos está aberto (por idImovel)
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [fotoArquivo, setFotoArquivo] = useState(null);
 
-  // Estados dos Modais
+  // estados dos Modais
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Estados dos formulários e seleção
+  // estados dos Formulários e Seleção
   const [selectedImovel, setSelectedImovel] = useState(null);
   const [novoImovel, setNovoImovel] = useState({
     endereco: '',
@@ -44,7 +41,7 @@ export function Imoveis() {
     valorIPTU: ''
   });
 
-  // GET: Buscar imóveis
+  // buscar imóveis do locador
   const carregarImoveis = async () => {
     try {
       setIsLoading(true);
@@ -71,11 +68,42 @@ export function Imoveis() {
     if (locadorId) carregarImoveis();
   }, [locadorId]);
 
-  // POST: Cadastrar novo imóvel
+  // envio de foto em Multipart
+  const enviarFoto = async (imovelId) => {
+    if (!fotoArquivo) return;
+
+    const formData = new FormData();
+    formData.append('foto', fotoArquivo);
+
+    try {
+      const response = await fetch(`http://localhost:8081/imoveis/${imovelId}/foto`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Erro devolvido pelo backend no upload:", errorText);
+        throw new Error('Falha ao enviar a foto para o servidor');
+      }
+
+      const imovelComFoto = await response.json();
+      console.log("Foto anexada com sucesso:", imovelComFoto);
+    } catch (error) {
+      console.error("Erro no upload da foto:", error);
+      alert("Imóvel salvo, mas ocorreu um erro ao carregar a imagem.");
+    }
+  };
+
+  // cadastrar novo imóvel
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     try {
       setIsSubmitting(true);
+
       const response = await fetch('http://localhost:8081/imoveis', {
         method: 'POST',
         headers: {
@@ -95,9 +123,21 @@ export function Imoveis() {
         throw new Error(errorText || 'Erro ao cadastrar imóvel');
       }
 
+      const imovelCriado = await response.json();
+      const idValido = imovelCriado.idImovel || imovelCriado.id;
+
+      if (fotoArquivo && idValido) {
+        await enviarFoto(idValido);
+      }
+
       setIsCreateModalOpen(false);
       setNovoImovel({ endereco: '', valorAluguel: '', valorIPTU: '' });
-      carregarImoveis();
+      setFotoArquivo(null);
+
+      setTimeout(() => {
+        carregarImoveis();
+      }, 400);
+
     } catch (error) {
       console.error("Erro ao salvar:", error);
       alert(`Falha ao salvar: ${error.message}`);
@@ -106,7 +146,7 @@ export function Imoveis() {
     }
   };
 
-  // PUT: Editar imóvel existente
+  // editar imóvel existente
   const handleEditOpen = (imovel) => {
     setSelectedImovel(imovel);
     setEditFormData({
@@ -114,6 +154,7 @@ export function Imoveis() {
       valorAluguel: imovel.valorAluguel,
       valorIPTU: imovel.valorIPTU || ''
     });
+    setFotoArquivo(null);
     setOpenMenuId(null);
     setIsEditModalOpen(true);
   };
@@ -137,9 +178,18 @@ export function Imoveis() {
 
       if (!response.ok) throw new Error('Erro ao atualizar imóvel');
 
+      if (fotoArquivo && selectedImovel?.idImovel) {
+        await enviarFoto(selectedImovel.idImovel);
+      }
+
       setIsEditModalOpen(false);
       setSelectedImovel(null);
-      carregarImoveis();
+      setFotoArquivo(null);
+
+      setTimeout(() => {
+        carregarImoveis();
+      }, 400);
+
     } catch (error) {
       console.error("Erro ao editar:", error);
       alert(`Falha ao atualizar: ${error.message}`);
@@ -148,7 +198,7 @@ export function Imoveis() {
     }
   };
 
-  // DELETE: Excluir imóvel
+  // excluir imóvel
   const handleDeleteOpen = (imovel) => {
     setSelectedImovel(imovel);
     setOpenMenuId(null);
@@ -196,9 +246,12 @@ export function Imoveis() {
           <h1 className="m-0 text-[29px] leading-[1.2] font-extrabold text-[#092b5a] max-[700px]:text-[25px]">Meus imóveis</h1>
           <p className="mt-2 text-[13px] text-[#748196] max-[700px]:text-xs max-[700px]:leading-[1.5]">Gerencie seus imóveis cadastrados.</p>
         </div>
-        
-        <button 
-          onClick={() => setIsCreateModalOpen(true)}
+
+        <button
+          onClick={() => {
+            setFotoArquivo(null);
+            setIsCreateModalOpen(true);
+          }}
           className="flex items-center gap-2 rounded-md bg-[#15966a] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#117a56]"
         >
           <Home className="size-4" />
@@ -221,25 +274,38 @@ export function Imoveis() {
         <section className="grid grid-cols-3 gap-5 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
           {imoveis.map((imovel) => (
             <div key={imovel.idImovel} className="flex flex-col overflow-hidden rounded-[9px] border border-[#e8edf2] bg-white shadow-sm transition-shadow hover:shadow-md relative">
-              
-              {/* Topo do Card com Status e Menu 3 Pontinhos */}
-              <div className="h-[140px] w-full bg-[#f0f4f8] relative">
-                <div className="flex h-full w-full items-center justify-center text-[#8995a5]">
-                  <Building2 className="size-10 opacity-30" />
-                </div>
-                
+
+              {/* Topo do Card com Foto ou Ícone Padrão */}
+              <div className="h-[140px] w-full bg-[#f0f4f8] relative overflow-hidden">
+                {imovel.fotoUrl ? (
+                  <img
+                    src={imovel.fotoUrl}
+                    alt={imovel.endereco}
+                    className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[#8995a5]">
+                    <Building2 className="size-10 opacity-30" />
+                  </div>
+                )}
+
                 {/* Badge de Status */}
-                <span className={`absolute top-3 left-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
-                  imovel.ocupacaoStatus === 'ALUGADO' ? 'bg-[#eaf6f0] text-[#15966a]' : 'bg-[#f0f4f8] text-[#46566b] border border-[#d2dbe4]'
+                <span className={`absolute top-3 left-3 z-10 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase shadow-sm ${
+                  imovel.ocupacaoStatus === 'ALUGADO' 
+                    ? 'bg-[#eaf6f0] text-[#15966a]' 
+                    : 'bg-white/90 text-[#46566b] border border-[#d2dbe4]'
                 }`}>
                   {imovel.ocupacaoStatus}
                 </span>
 
                 {/* Botão de Menu (Três Pontinhos) */}
-                <div className="absolute top-3 right-3">
-                  <button 
+                <div className="absolute top-3 right-3 z-10">
+                  <button
                     onClick={() => setOpenMenuId(openMenuId === imovel.idImovel ? null : imovel.idImovel)}
-                    className="flex size-7 items-center justify-center rounded-full bg-white/80 text-[#092b5a] shadow-sm hover:bg-white transition-colors"
+                    className="flex size-7 items-center justify-center rounded-full bg-white/90 text-[#092b5a] shadow-sm hover:bg-white transition-colors"
                   >
                     <MoreVertical className="size-4" />
                   </button>
@@ -247,14 +313,14 @@ export function Imoveis() {
                   {/* Dropdown do Menu */}
                   {openMenuId === imovel.idImovel && (
                     <div className="absolute right-0 mt-1 w-36 rounded-md bg-white py-1 shadow-lg border border-[#e8edf2] z-20">
-                      <button 
+                      <button
                         onClick={() => handleEditOpen(imovel)}
                         className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#092b5a] hover:bg-[#f6f8fa]"
                       >
                         <Pencil className="size-3.5 text-[#15966a]" />
                         Editar
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDeleteOpen(imovel)}
                         className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50"
                       >
@@ -275,7 +341,7 @@ export function Imoveis() {
                   <MapPin className="mt-[2px] size-[13px] shrink-0" />
                   <span className="leading-tight line-clamp-2">{imovel.endereco}</span>
                 </div>
-                
+
                 <div className="mt-auto pt-3 border-t border-[#e8edf2] flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-[#8995a5]">Valor do aluguel</span>
                   <strong className="text-[14px] text-[#092b5a]">
@@ -302,50 +368,60 @@ export function Imoveis() {
             <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-[#46566b]">Endereço Completo</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] focus:ring-1 focus:ring-[#15966a]"
                   value={novoImovel.endereco}
-                  onChange={(e) => setNovoImovel({...novoImovel, endereco: e.target.value})}
+                  onChange={(e) => setNovoImovel({ ...novoImovel, endereco: e.target.value })}
                 />
               </div>
 
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="mb-1 block text-xs font-semibold text-[#46566b]">Valor Aluguel (R$)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="0.01"
                     required
                     className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] focus:ring-1 focus:ring-[#15966a]"
                     value={novoImovel.valorAluguel}
-                    onChange={(e) => setNovoImovel({...novoImovel, valorAluguel: e.target.value})}
+                    onChange={(e) => setNovoImovel({ ...novoImovel, valorAluguel: e.target.value })}
                   />
                 </div>
-                
+
                 <div className="flex-1">
                   <label className="mb-1 block text-xs font-semibold text-[#46566b]">Valor IPTU (R$)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="0.01"
                     className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] focus:ring-1 focus:ring-[#15966a]"
                     value={novoImovel.valorIPTU}
-                    onChange={(e) => setNovoImovel({...novoImovel, valorIPTU: e.target.value})}
+                    onChange={(e) => setNovoImovel({ ...novoImovel, valorIPTU: e.target.value })}
                   />
                 </div>
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#46566b]">Foto do Imóvel</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="w-full rounded-md border border-[#e8edf2] px-3 py-1.5 text-sm text-[#092b5a] file:mr-3 file:rounded-md file:border-0 file:bg-[#eaf6f0] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[#15966a] hover:file:bg-[#d8efe3]"
+                  onChange={(e) => setFotoArquivo(e.target.files[0])}
+                />
+              </div>
+
               <div className="mt-4 flex gap-3">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsCreateModalOpen(false)}
                   className="flex-1 rounded-md border border-[#e8edf2] py-2.5 text-sm font-semibold text-[#46566b] hover:bg-[#f6f8fa]"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="flex-1 rounded-md bg-[#15966a] py-2.5 text-sm font-semibold text-white hover:bg-[#117a56] disabled:opacity-70"
                 >
@@ -371,50 +447,60 @@ export function Imoveis() {
             <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-[#46566b]">Endereço Completo</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] focus:ring-1 focus:ring-[#15966a]"
                   value={editFormData.endereco}
-                  onChange={(e) => setEditFormData({...editFormData, endereco: e.target.value})}
+                  onChange={(e) => setEditFormData({ ...editFormData, endereco: e.target.value })}
                 />
               </div>
 
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="mb-1 block text-xs font-semibold text-[#46566b]">Valor Aluguel (R$)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="0.01"
                     required
                     className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] focus:ring-1 focus:ring-[#15966a]"
                     value={editFormData.valorAluguel}
-                    onChange={(e) => setEditFormData({...editFormData, valorAluguel: e.target.value})}
+                    onChange={(e) => setEditFormData({ ...editFormData, valorAluguel: e.target.value })}
                   />
                 </div>
-                
+
                 <div className="flex-1">
                   <label className="mb-1 block text-xs font-semibold text-[#46566b]">Valor IPTU (R$)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="0.01"
                     className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] focus:ring-1 focus:ring-[#15966a]"
                     value={editFormData.valorIPTU}
-                    onChange={(e) => setEditFormData({...editFormData, valorIPTU: e.target.value})}
+                    onChange={(e) => setEditFormData({ ...editFormData, valorIPTU: e.target.value })}
                   />
                 </div>
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#46566b]">Foto do Imóvel (Opcional para alterar)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="w-full rounded-md border border-[#e8edf2] px-3 py-1.5 text-sm text-[#092b5a] file:mr-3 file:rounded-md file:border-0 file:bg-[#eaf6f0] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[#15966a] hover:file:bg-[#d8efe3]"
+                  onChange={(e) => setFotoArquivo(e.target.files[0])}
+                />
+              </div>
+
               <div className="mt-4 flex gap-3">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsEditModalOpen(false)}
                   className="flex-1 rounded-md border border-[#e8edf2] py-2.5 text-sm font-semibold text-[#46566b] hover:bg-[#f6f8fa]"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="flex-1 rounded-md bg-[#15966a] py-2.5 text-sm font-semibold text-white hover:bg-[#117a56] disabled:opacity-70"
                 >
@@ -439,13 +525,13 @@ export function Imoveis() {
             </p>
 
             <div className="mt-6 flex gap-3">
-              <button 
+              <button
                 onClick={() => setIsDeleteModalOpen(false)}
                 className="flex-1 rounded-md border border-[#e8edf2] py-2 text-sm font-semibold text-[#46566b] hover:bg-[#f6f8fa]"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 onClick={handleDeleteConfirm}
                 disabled={isSubmitting}
                 className="flex-1 rounded-md bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-70"
