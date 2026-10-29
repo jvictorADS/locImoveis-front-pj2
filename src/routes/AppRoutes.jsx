@@ -5,6 +5,7 @@ import { Cadastro } from '../pages/Cadastro';
 import { MenuPrincipal, Dashboard, SectionPage } from '../pages/MenuPrincipal';
 import { Imoveis } from '../pages/MeusImoveis';
 import { Contratos } from '../pages/Contratos';
+import { Inquilinos } from '../pages/Inquilinos'
 
 export function AppRoutes() {
   const { isAuthenticated } = useAuth();
@@ -19,9 +20,8 @@ export function AppRoutes() {
       <Route element={<MenuPrincipal />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/imoveis" element={<Imoveis />} />
-        
+        <Route path="/inquilinos" element={<Inquilinos />} />
         <Route path="/contratos" element={<Contratos />} /> 
-        
         <Route path="/financeiro" element={<SectionPage section="financeiro" />} />
       </Route>
 
