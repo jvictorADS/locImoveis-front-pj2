@@ -2,11 +2,12 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Login } from '../pages/Login';
 import { Cadastro } from '../pages/Cadastro';
-import { MenuPrincipal, Dashboard, SectionPage } from '../pages/MenuPrincipal';
+import { MenuPrincipal, Dashboard } from '../pages/MenuPrincipal';
 import { Imoveis } from '../pages/MeusImoveis';
 import { Contratos } from '../pages/Contratos';
 import { Inquilinos } from '../pages/Inquilinos'
 import { Manutencoes } from '../pages/Manutencoes';
+import { Financeiro } from '../pages/Financeiro';
 
 export function AppRoutes() {
   const { isAuthenticated } = useAuth();
@@ -24,7 +25,7 @@ export function AppRoutes() {
         <Route path="/inquilinos" element={<Inquilinos />} />
         <Route path="/contratos" element={<Contratos />} /> 
         <Route path="/manutencoes" element={<Manutencoes />} />
-        <Route path="/financeiro" element={<SectionPage section="financeiro" />} />
+        <Route path="/financeiro" element={<Financeiro />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

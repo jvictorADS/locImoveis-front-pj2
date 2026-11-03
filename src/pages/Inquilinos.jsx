@@ -114,7 +114,11 @@ export function Inquilinos() {
 
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
-                throw new Error(err.message || 'Erro ao salvar informações do inquilino.');
+                const mensagem = err.mensagem
+                    || err.message
+                    || err.errors?.map((error) => error.defaultMessage).join(' | ')
+                    || 'Erro ao salvar informações do inquilino.';
+                throw new Error(mensagem);
             }
 
             setIsModalOpen(false);
@@ -323,6 +327,7 @@ export function Inquilinos() {
                                 <label className="mb-1 block text-xs font-semibold text-[#46566b]">Telefone</label>
                                 <input
                                     type="text"
+                                    required
                                     placeholder="(00) 00000-0000"
                                     className="w-full rounded-md border border-[#e8edf2] px-3 py-2 text-sm outline-none focus:border-[#15966a]"
                                     value={formData.telefone}
