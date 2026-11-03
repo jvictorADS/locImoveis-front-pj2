@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -14,10 +14,10 @@ import {
   AlertTriangle,
   Loader2,
   Users,
-  PlusCircle,
   ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 const sections = [
   {
@@ -43,6 +43,12 @@ const sections = [
     label: 'Contratos',
     description: 'Consulte as locações',
     icon: FileText,
+  },
+  {
+    path: '/manutencoes',
+    label: 'Manutenções',
+    description: 'Acompanhe os pedidos de manutenção',
+    icon: Wrench,
   },
   {
     path: '/financeiro',
@@ -150,7 +156,7 @@ export function MenuPrincipal() {
         </header>
 
         {/* Menu Responsivo Mobile com 5 Colunas */}
-        <nav className="hidden grid-cols-5 gap-0 border-b border-[#e8edf2] bg-white px-2 pt-[7px] max-[700px]:grid" aria-label="Seções principais">
+        <nav className="hidden grid-cols-6 gap-0 border-b border-[#e8edf2] bg-white px-2 pt-[7px] max-[700px]:grid" aria-label="Seções principais">
           {sections.map(({ path, label, icon: Icon }) => (
             <NavLink key={path} to={path} end className={({ isActive }) => `flex min-h-[51px] min-w-0 flex-col items-center justify-center gap-[3px] border-b-2 px-px py-[3px] text-center text-[9px] font-semibold no-underline ${isActive ? 'border-[#15966a] text-[#092b5a]' : 'border-transparent text-[#6e7d90]'}`}>
               <Icon className="size-[15px]" aria-hidden="true" /><span className="truncate max-w-full px-0.5">{label}</span>
@@ -168,6 +174,8 @@ export function Dashboard() {
   const [metricas, setMetricas] = useState(null);
   const [inadimplentes, setInadimplentes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [tentativa, setTentativa] = useState(0);
 
   const today = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -179,41 +187,42 @@ export function Dashboard() {
     async function carregarDashboard() {
       try {
         setIsLoading(true);
-        
-        // TODO: Substitua este bloco pela sua chamada de API real.
-        const data = {
-          metricas: {
-            recebidoMes: 0,
-            gastosReformas: 0,
-            totalPendente: 0,
-            imoveisAlugados: 0,
-            imoveisVagos: 0,
-          },
-          inadimplentes: [],
-          graficoFluxo: [] 
-        };
-
-        setMetricas(data.metricas);
-        setInadimplentes(data.inadimplentes);
+        setLoadError('');
+        const { data } = await api.get('/dashboard');
+        setMetricas(data);
+        setInadimplentes(data.inadimplentes ?? []);
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
+        setLoadError('Não foi possível carregar o painel financeiro. Verifique sua conexão e tente novamente.');
       } finally {
         setIsLoading(false);
       }
     }
 
     carregarDashboard();
-  }, []);
+  }, [tentativa]);
 
   const formatarMoeda = (valor) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
 
-  if (isLoading || !metricas) {
+  if (isLoading) {
     return (
       <div className="flex h-[50vh] flex-col items-center justify-center text-[#15966a]">
         <Loader2 className="size-8 animate-spin" />
         <p className="mt-4 text-sm font-semibold text-[#092b5a]">Carregando seu painel...</p>
       </div>
+    );
+  }
+
+  if (loadError || !metricas) {
+    return (
+      <section className="flex min-h-[310px] flex-col items-center justify-center rounded-lg border border-[#e8edf2] bg-white px-5 py-8 text-center" role="alert">
+        <AlertTriangle className="size-8 text-[#eb5757]" aria-hidden="true" />
+        <p className="mt-4 text-sm font-semibold text-[#092b5a]">{loadError || 'Não há dados disponíveis para o painel.'}</p>
+        <button className="mt-4 cursor-pointer rounded-md border-0 bg-[#15966a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#117a56]" type="button" onClick={() => setTentativa((valor) => valor + 1)}>
+          Tentar novamente
+        </button>
+      </section>
     );
   }
 
@@ -330,7 +339,12 @@ export function Dashboard() {
             <span className="grid size-8 place-items-center rounded-md bg-[#fff4e5] text-[#f2994a]"><Wrench className="size-4" /></span>
             <span className="text-xs font-semibold text-[#748196]">Gastos em Reformas</span>
           </div>
-          <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(metricas.gastosReformas)}</strong>
+          {metricas.gastosReformas == null ? (
+            <span className="text-lg font-bold text-[#748196]">Sem dados</span>
+          ) : (
+            <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(metricas.gastosReformas)}</strong>
+          )}
+          <p className="mt-1 text-[11px] text-[#8995a5]">Total informado nas manutenções</p>
         </div>
 
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
