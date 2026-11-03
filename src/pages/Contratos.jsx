@@ -15,7 +15,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 export function Contratos() {
-    const { user, token } = useAuth();
+    const { token } = useAuth();
     const jwtToken = token || localStorage.getItem('token');
 
     const [contratos, setContratos] = useState([]);
@@ -60,7 +60,7 @@ export function Contratos() {
                 fetch('http://localhost:8081/contratos', {
                     headers: { 'Authorization': `Bearer ${jwtToken}` }
                 }),
-                fetch(`http://localhost:8081/imoveis/locador/${user?.id || 1}`, {
+                fetch('http://localhost:8081/imoveis/me', {
                     headers: { 'Authorization': `Bearer ${jwtToken}` }
                 }),
                 fetch('http://localhost:8081/usuarios/tipo/LOCATARIO', {

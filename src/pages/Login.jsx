@@ -20,7 +20,7 @@ export function Login() {
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setErro(result.error);
+      setErro(result.error);                          
     }
   };
 

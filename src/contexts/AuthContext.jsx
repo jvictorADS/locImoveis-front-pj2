@@ -1,6 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { api } from '../services/api';
-import axios from 'axios';
 
 const AuthContext = createContext({});
 
@@ -9,11 +8,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
 const registrar = async (dadosUsuario) => {
-    setLoading(true);
-    localStorage.removeItem('token');
+  setLoading(true);
     
-    try {
-      const response = await fetch('http://localhost:8081/usuarios', {
+  try {
+    const response = await fetch('http://localhost:8081/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -46,6 +44,8 @@ const registrar = async (dadosUsuario) => {
         return { success: false, error: mensagem };
       }
 
+      localStorage.removeItem('token');
+      setToken(null);
       return { success: true };
     } catch (error) {
       console.error("Erro na requisição:", error);

@@ -93,6 +93,143 @@ const sectionDetails = {
   },
 };
 
+function GraficoFluxoCaixa({ dados, formatarMoeda }) {
+  const [periodo, setPeriodo] = useState(6);
+  const meses = Array.isArray(dados) ? dados.slice(-periodo) : [];
+  const series = [
+    { chave: 'recebido', nome: 'Arrecadado', cor: '#092b5a' },
+    { chave: 'gastosReformas', nome: 'Reformas/Despesas', cor: '#f2c94c' },
+    { chave: 'inadimplencia', nome: 'Inadimplência', cor: '#eb5757' },
+  ];
+  const valores = meses.flatMap((mes) => series.map(({ chave }) => Number(mes[chave]) || 0));
+  const maiorValor = Math.max(...valores, 0);
+  const limite = maiorValor > 0 ? maiorValor * 1.1 : 1000;
+  const largura = 900;
+  const altura = 300;
+  const margem = { topo: 16, direita: 12, baixo: 42, esquerda: 82 };
+  const larguraGrafico = largura - margem.esquerda - margem.direita;
+  const alturaGrafico = altura - margem.topo - margem.baixo;
+  const larguraGrupo = meses.length ? larguraGrafico / meses.length : 0;
+  const larguraBarra = Math.min(18, larguraGrupo * 0.18);
+  const espacoBarras = Math.min(5, larguraGrupo * 0.04);
+  const formatarEixo = (valor) => new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(valor);
+  const formatarMes = (mes) => {
+    const data = new Date(`${mes.mes}-01T12:00:00`);
+    const nomeMes = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(data).replace('.', '');
+    const ano = new Intl.DateTimeFormat('pt-BR', { year: '2-digit' }).format(data);
+    return `${nomeMes}/${ano}`;
+  };
+  const temMovimentacao = valores.some((valor) => valor > 0);
+
+  return (
+    <section className="mb-8 rounded-lg border border-[#e8edf2] bg-white p-6 shadow-sm max-[700px]:p-4">
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-[16px] font-bold text-[#092b5a]">Fluxo de Caixa e Ocorrências</h2>
+          <p className="mt-1 text-[13px] text-[#748196]">Recebimentos, gastos de manutenção e valores em atraso agrupados por mês.</p>
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Período do gráfico">
+          {[6, 12].map((quantidade) => (
+            <button
+              key={quantidade}
+              type="button"
+              aria-pressed={periodo === quantidade}
+              onClick={() => setPeriodo(quantidade)}
+              className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${periodo === quantidade ? 'border-[#092b5a] bg-[#092b5a] text-white' : 'border-[#dce3eb] bg-white text-[#46566b] hover:border-[#092b5a]'}`}
+            >
+              {quantidade} meses
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-[#46566b]" aria-label="Legenda">
+        {series.map(({ nome, cor }) => (
+          <div key={nome} className="flex items-center gap-1.5">
+            <span className="size-3 rounded-sm" style={{ backgroundColor: cor }} aria-hidden="true" />
+            {nome}
+          </div>
+        ))}
+      </div>
+
+      {Array.isArray(dados) ? (
+        <div className="relative overflow-x-auto">
+          {meses.length > 0 ? (
+            <svg
+              className="h-[300px] min-w-[640px] w-full"
+              viewBox={`0 0 ${largura} ${altura}`}
+              role="group"
+              aria-labelledby="grafico-fluxo-titulo"
+              aria-describedby="grafico-fluxo-descricao"
+            >
+              <title id="grafico-fluxo-titulo">Fluxo de caixa nos últimos {periodo} meses</title>
+              <desc id="grafico-fluxo-descricao">Gráfico de barras agrupadas. Cada barra pode ser focada para consultar o valor exato.</desc>
+              {[0, 1, 2, 3, 4].map((marcador) => {
+                const valor = (limite * marcador) / 4;
+                const y = margem.topo + alturaGrafico - (alturaGrafico * marcador) / 4;
+                return (
+                  <g key={marcador}>
+                    <line x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} stroke="#e8edf2" strokeDasharray={marcador === 0 ? undefined : '4 4'} />
+                    <text x={margem.esquerda - 10} y={y + 4} textAnchor="end" fill="#748196" fontSize="11">{formatarEixo(valor)}</text>
+                  </g>
+                );
+              })}
+              {meses.map((mes, indice) => {
+                const centroGrupo = margem.esquerda + larguraGrupo * (indice + 0.5);
+                const larguraTotal = (larguraBarra * series.length) + (espacoBarras * (series.length - 1));
+                const inicioGrupo = centroGrupo - (larguraTotal / 2);
+                return (
+                  <g key={mes.mes}>
+                    {series.map(({ chave, nome, cor }, serieIndice) => {
+                      const valor = Number(mes[chave]) || 0;
+                      const alturaBarra = (valor / limite) * alturaGrafico;
+                      const x = inicioGrupo + serieIndice * (larguraBarra + espacoBarras);
+                      const y = margem.topo + alturaGrafico - alturaBarra;
+                      return (
+                        <rect
+                          key={chave}
+                          x={x}
+                          y={y}
+                          width={larguraBarra}
+                          height={Math.max(alturaBarra, 0)}
+                          rx="3"
+                          fill={cor}
+                          tabIndex="0"
+                          aria-label={`${formatarMes(mes)}: ${nome}, ${formatarMoeda(valor)}`}
+                          className="focus:stroke-[#15966a] focus:stroke-[3px]"
+                        >
+                          <title>{`${formatarMes(mes)} — ${nome}: ${formatarMoeda(valor)}`}</title>
+                        </rect>
+                      );
+                    })}
+                    <text x={centroGrupo} y={altura - 12} textAnchor="middle" fill="#748196" fontSize="11">{formatarMes(mes)}</text>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            <p className="py-12 text-center text-sm text-[#748196]">Não há histórico mensal disponível para o gráfico.</p>
+          )}
+          {meses.length > 0 && !temMovimentacao && (
+            <p className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-[#748196]">
+              Nenhuma movimentação financeira no período.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="rounded-md bg-[#fcfcfd] px-4 py-10 text-center text-sm text-[#748196]">
+          O histórico mensal não foi retornado pela API.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function MenuPrincipal() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -385,26 +522,7 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* Estrutura do Gráfico (Fluxo de Caixa) */}
-      <section className="rounded-lg border border-[#e8edf2] bg-white p-6 shadow-sm mb-8">
-        <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-[16px] font-bold text-[#092b5a]">Fluxo de Caixa e Ocorrências</h2>
-            <p className="mt-1 text-[13px] text-[#748196]">Arrecadação vs. Inadimplência vs. Gastos com Reformas.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-[12px] font-medium text-[#46566b]">
-            <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-[#092b5a]"></span>Arrecadado</div>
-            <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-[#f2c94c]"></span>Reformas/Desp.</div>
-            <div className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-[#eb5757]"></span>Inadimplência</div>
-          </div>
-        </div>
-
-        <div className="flex h-[300px] w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-[#e8edf2] bg-[#fcfcfd] text-[#8995a5]">
-          <TrendingUp className="mb-3 size-8 opacity-40" />
-          <span className="text-[13px] font-medium">Área reservada para o Gráfico de Barras</span>
-          <span className="mt-1 text-[11px] opacity-70">Aguardando integração com os dados da API</span>
-        </div>
-      </section>
+      <GraficoFluxoCaixa dados={metricas.fluxoCaixa} formatarMoeda={formatarMoeda} />
 
       {/* Tabela de Controle/Alertas */}
       <section className="rounded-lg border border-[#e8edf2] bg-white overflow-hidden shadow-sm mb-8">

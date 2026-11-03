@@ -12,9 +12,8 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 export function Imoveis() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const jwtToken = token || localStorage.getItem('token');
-  const locadorId = user?.id || user?.idUsuario || 1;
 
   const [imoveis, setImoveis] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +44,7 @@ export function Imoveis() {
   const carregarImoveis = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`http://localhost:8081/imoveis/locador/${locadorId}`, {
+      const response = await fetch('http://localhost:8081/imoveis/me', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -65,8 +64,8 @@ export function Imoveis() {
   };
 
   useEffect(() => {
-    if (locadorId) carregarImoveis();
-  }, [locadorId]);
+    if (jwtToken) carregarImoveis();
+  }, [jwtToken]);
 
   // envio de foto em Multipart
   const enviarFoto = async (imovelId) => {
@@ -114,7 +113,6 @@ export function Imoveis() {
           endereco: novoImovel.endereco,
           valorAluguel: parseFloat(novoImovel.valorAluguel),
           valorIPTU: novoImovel.valorIPTU ? parseFloat(novoImovel.valorIPTU) : 0.0,
-          locadorId: locadorId
         })
       });
 
