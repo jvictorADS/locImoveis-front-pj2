@@ -12,7 +12,10 @@ import {
   Wrench,
   AlertCircle,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Users,
+  PlusCircle,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -28,6 +31,12 @@ const sections = [
     label: 'Meus imóveis',
     description: 'Acompanhe seu portfólio',
     icon: Building2,
+  },
+  {
+    path: '/inquilinos',
+    label: 'Inquilinos',
+    description: 'Gerencie os locatários',
+    icon: Users,
   },
   {
     path: '/contratos',
@@ -51,6 +60,14 @@ const sectionDetails = {
     icon: Building2,
     emptyTitle: 'Nenhum imóvel para exibir',
     emptyDescription: 'Quando seus imóveis estiverem disponíveis, você poderá acompanhá-los por aqui.',
+  },
+  inquilinos: {
+    title: 'Inquilinos',
+    eyebrow: 'CADASTROS',
+    description: 'Gerencie os locatários da sua carteira.',
+    icon: Users,
+    emptyTitle: 'Nenhum inquilino para exibir',
+    emptyDescription: 'Cadastre os locatários para vincular aos seus imóveis e contratos.',
   },
   contratos: {
     title: 'Contratos',
@@ -83,7 +100,6 @@ export function MenuPrincipal() {
 
   return (
     <div className="flex min-h-screen bg-[#f6f8fa] text-[#18304d] max-[700px]:block">
-      {/* Aqui foi adicionado: sticky top-0 h-screen */}
       <aside className="sticky top-0 flex h-screen w-[254px] shrink-0 flex-col bg-[#092b5a] px-4 pt-[27px] pb-[18px] text-white max-[700px]:hidden">
         <Link className="mb-[54px] ml-2 inline-flex items-center gap-[10px] self-start text-white no-underline" to="/dashboard" aria-label="Loc Imóveis, ir para o dashboard">
           <span className="grid size-[38px] place-items-center rounded-[10px] bg-[#15966a]"><Home className="size-[21px]" aria-hidden="true" /></span>
@@ -133,10 +149,11 @@ export function MenuPrincipal() {
           </button>
         </header>
 
-        <nav className="hidden grid-cols-4 gap-0 border-b border-[#e8edf2] bg-white px-2 pt-[7px] max-[700px]:grid" aria-label="Seções principais">
+        {/* Menu Responsivo Mobile com 5 Colunas */}
+        <nav className="hidden grid-cols-5 gap-0 border-b border-[#e8edf2] bg-white px-2 pt-[7px] max-[700px]:grid" aria-label="Seções principais">
           {sections.map(({ path, label, icon: Icon }) => (
             <NavLink key={path} to={path} end className={({ isActive }) => `flex min-h-[51px] min-w-0 flex-col items-center justify-center gap-[3px] border-b-2 px-px py-[3px] text-center text-[9px] font-semibold no-underline ${isActive ? 'border-[#15966a] text-[#092b5a]' : 'border-transparent text-[#6e7d90]'}`}>
-              <Icon className="size-[15px]" aria-hidden="true" /><span className="whitespace-nowrap">{label}</span>
+              <Icon className="size-[15px]" aria-hidden="true" /><span className="truncate max-w-full px-0.5">{label}</span>
             </NavLink>
           ))}
         </nav>
@@ -223,6 +240,78 @@ export function Dashboard() {
           <div className="absolute right-[132px] bottom-7 grid h-[102px] w-[78px] grid-cols-2 gap-[9px] border border-[#ffffff43] bg-[#ffffff12] px-3 pt-[15px] pb-3 opacity-[.72]"><span className="h-[14px] w-[10px] bg-[#84ddb6]" /><span className="h-[14px] w-[10px] bg-[#84ddb6]" /><span className="h-[14px] w-[10px] bg-[#84ddb6]" /><span className="h-[14px] w-[10px] bg-[#84ddb6]" /></div>
           <div className="absolute right-10 bottom-7 grid h-[133px] w-[106px] grid-cols-2 gap-[9px] border border-[#ffffff70] bg-[#ffffff1c] px-3 pt-[15px] pb-3"><span className="h-4 w-3 bg-[#84ddb6]" /><span className="h-4 w-3 bg-[#84ddb6]" /><span className="h-4 w-3 bg-[#84ddb6]" /><span className="h-4 w-3 bg-[#84ddb6]" /></div>
           <div className="absolute right-0 bottom-[27px] left-0 h-px bg-[#ffffff60]" />
+        </div>
+      </section>
+
+      {/* BLOCO DE ACESSO RÁPIDO */}
+      <section className="mb-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold tracking-wide uppercase text-[#092b5a]">Acesso Rápido</h2>
+        </div>
+        <div className="grid grid-cols-4 gap-4 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
+          <Link
+            to="/inquilinos"
+            className="flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md no-underline group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-[#eaf6f0] text-[#15966a] group-hover:bg-[#15966a] group-hover:text-white transition-colors">
+                <Users className="size-5" />
+              </span>
+              <div>
+                <strong className="block text-sm font-bold text-[#092b5a]">Inquilinos</strong>
+                <span className="text-xs text-[#748196]">Gerenciar locatários</span>
+              </div>
+            </div>
+            <ChevronRight className="size-4 text-[#8995a5] group-hover:text-[#15966a] transition-colors" />
+          </Link>
+
+          <Link
+            to="/imoveis"
+            className="flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md no-underline group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-[#f0f4f8] text-[#092b5a] group-hover:bg-[#092b5a] group-hover:text-white transition-colors">
+                <Building2 className="size-5" />
+              </span>
+              <div>
+                <strong className="block text-sm font-bold text-[#092b5a]">Meus Imóveis</strong>
+                <span className="text-xs text-[#748196]">Cadastrar e listar</span>
+              </div>
+            </div>
+            <ChevronRight className="size-4 text-[#8995a5] group-hover:text-[#092b5a] transition-colors" />
+          </Link>
+
+          <Link
+            to="/contratos"
+            className="flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md no-underline group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-[#f0f4f8] text-[#092b5a] group-hover:bg-[#092b5a] group-hover:text-white transition-colors">
+                <FileText className="size-5" />
+              </span>
+              <div>
+                <strong className="block text-sm font-bold text-[#092b5a]">Contratos</strong>
+                <span className="text-xs text-[#748196]">Criar e consultar</span>
+              </div>
+            </div>
+            <ChevronRight className="size-4 text-[#8995a5] group-hover:text-[#092b5a] transition-colors" />
+          </Link>
+
+          <Link
+            to="/financeiro"
+            className="flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md no-underline group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-[#f0f4f8] text-[#092b5a] group-hover:bg-[#092b5a] group-hover:text-white transition-colors">
+                <Wallet className="size-5" />
+              </span>
+              <div>
+                <strong className="block text-sm font-bold text-[#092b5a]">Financeiro</strong>
+                <span className="text-xs text-[#748196]">Baixas e relatórios</span>
+              </div>
+            </div>
+            <ChevronRight className="size-4 text-[#8995a5] group-hover:text-[#092b5a] transition-colors" />
+          </Link>
         </div>
       </section>
 
