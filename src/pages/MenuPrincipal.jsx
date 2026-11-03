@@ -257,7 +257,7 @@ export function Dashboard() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold tracking-wide uppercase text-[#092b5a]">Acesso Rápido</h2>
         </div>
-        <div className="grid grid-cols-4 gap-4 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
+        <div className="grid grid-cols-5 gap-4 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
           <Link
             to="/inquilinos"
             className="flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md no-underline group"
@@ -304,6 +304,22 @@ export function Dashboard() {
               </div>
             </div>
             <ChevronRight className="size-4 text-[#8995a5] group-hover:text-[#092b5a] transition-colors" />
+          </Link>
+
+          <Link
+            to="/manutencoes"
+            className="flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md no-underline group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-lg bg-[#fff4e5] text-[#f2994a] group-hover:bg-[#f2994a] group-hover:text-white transition-colors">
+                <Wrench className="size-5" />
+              </span>
+              <div>
+                <strong className="block text-sm font-bold text-[#092b5a]">Manutenções</strong>
+                <span className="text-xs text-[#748196]">Controlar pedidos</span>
+              </div>
+            </div>
+            <ChevronRight className="size-4 text-[#8995a5] group-hover:text-[#15966a] transition-colors" />
           </Link>
 
           <Link

@@ -7,7 +7,10 @@ import {
     Pencil,
     Eye,
     Download,
-    Calendar
+    Calendar,
+    Receipt,
+    CheckCircle2,
+    RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -29,6 +32,12 @@ export function Contratos() {
     const [pdfUrl, setPdfUrl] = useState(null);
     const [pdfArquivo, setPdfArquivo] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isParcelasModalOpen, setIsParcelasModalOpen] = useState(false);
+    const [contratoParcelas, setContratoParcelas] = useState(null);
+    const [parcelas, setParcelas] = useState([]);
+    const [isLoadingParcelas, setIsLoadingParcelas] = useState(false);
+    const [parcelaAtualizandoId, setParcelaAtualizandoId] = useState(null);
+    const [parcelasError, setParcelasError] = useState('');
 
     const contratoVazio = {
         imovelId: '',
@@ -220,6 +229,56 @@ export function Contratos() {
         }
     };
 
+    const abrirModalParcelas = async (contrato) => {
+        const contratoId = contrato.idContrato || contrato.id;
+        setContratoParcelas(contrato);
+        setParcelas([]);
+        setParcelasError('');
+        setIsParcelasModalOpen(true);
+        setIsLoadingParcelas(true);
+
+        try {
+            const response = await fetch(`http://localhost:8081/cobrancas/contrato/${contratoId}/parcelas/gerar`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${jwtToken}` }
+            });
+            const dados = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(dados.mensagem || dados.message || 'Não foi possível carregar as parcelas.');
+            }
+            setParcelas(dados);
+        } catch (error) {
+            setParcelasError(error.message);
+        } finally {
+            setIsLoadingParcelas(false);
+        }
+    };
+
+    const alterarStatusParcela = async (parcela) => {
+        const marcarPendente = parcela.cobrancaStatus === 'PAGA';
+        setParcelaAtualizandoId(parcela.idCobranca);
+        setParcelasError('');
+
+        try {
+            const acao = marcarPendente ? 'pendente' : 'pagar';
+            const response = await fetch(`http://localhost:8081/cobrancas/${parcela.idCobranca}/${acao}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${jwtToken}` }
+            });
+            const dados = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(dados.mensagem || dados.message || 'Não foi possível atualizar o recebimento.');
+            }
+            setParcelas((atuais) => atuais.map((item) =>
+                item.idCobranca === dados.idCobranca ? dados : item
+            ));
+        } catch (error) {
+            setParcelasError(error.message);
+        } finally {
+            setParcelaAtualizandoId(null);
+        }
+    };
+
     const obterNomeInquilino = (contrato) => {
         if (contrato.locatarioNome) return contrato.locatarioNome;
 
@@ -316,6 +375,14 @@ export function Contratos() {
                                                 </button>
                                             )}
                                             <button
+                                                onClick={() => abrirModalParcelas(contrato)}
+                                                title="Ver parcelas do aluguel"
+                                                aria-label={`Ver parcelas do aluguel de ${obterNomeInquilino(contrato)}`}
+                                                className="p-1.5 text-[#15966a] hover:bg-[#eaf6f0] rounded-md transition-colors"
+                                            >
+                                                <Receipt className="size-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => abrirModalEdicao(contrato)}
                                                 title="Editar Contrato"
                                                 className="p-1.5 text-[#092b5a] hover:bg-[#e8edf2] rounded-md transition-colors"
@@ -328,6 +395,96 @@ export function Contratos() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {isParcelasModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#092b5a]/45 p-4 backdrop-blur-sm">
+                    <section className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="parcelas-titulo">
+                        <div className="flex items-start justify-between gap-4 border-b border-[#e8edf2] bg-[#f8fafc] px-5 py-4 sm:px-6">
+                            <div>
+                                <h2 id="parcelas-titulo" className="m-0 text-lg font-bold text-[#092b5a]">Parcelas do aluguel</h2>
+                                <p className="mt-1 text-xs text-[#748196]">{contratoParcelas && obterNomeInquilino(contratoParcelas)} · {contratoParcelas?.dataInicio} até {contratoParcelas?.dataFim}</p>
+                            </div>
+                            <button
+                                className="rounded-md p-1 text-[#8995a5] hover:bg-white hover:text-[#092b5a]"
+                                type="button"
+                                onClick={() => setIsParcelasModalOpen(false)}
+                                aria-label="Fechar parcelas"
+                            ><X className="size-5" /></button>
+                        </div>
+
+                        {!isLoadingParcelas && parcelas.length > 0 && (
+                            <div className="flex flex-wrap gap-x-6 gap-y-2 border-b border-[#e8edf2] px-5 py-3 text-xs sm:px-6">
+                                <span className="font-semibold text-[#092b5a]">{parcelas.length} parcelas</span>
+                                <span className="text-[#748196]">Total previsto: <strong className="text-[#092b5a]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parcelas.reduce((total, parcela) => total + Number(parcela.valor || 0), 0))}</strong></span>
+                                <span className="text-[#748196]">Recebido: <strong className="text-[#15966a]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parcelas.filter((parcela) => parcela.cobrancaStatus === 'PAGA').reduce((total, parcela) => total + Number(parcela.valor || 0), 0))}</strong></span>
+                            </div>
+                        )}
+
+                        {parcelasError && <p className="mx-5 mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 sm:mx-6" role="alert">{parcelasError}</p>}
+
+                        <div className="min-h-0 flex-1 overflow-auto p-5 sm:p-6">
+                            {isLoadingParcelas ? (
+                                <div className="flex min-h-[220px] flex-col items-center justify-center text-[#15966a]">
+                                    <Loader2 className="size-7 animate-spin" />
+                                    <p className="mt-3 text-sm font-semibold text-[#092b5a]">Preparando parcelas...</p>
+                                </div>
+                            ) : parcelas.length === 0 ? (
+                                <p className="py-10 text-center text-sm text-[#748196]">Este contrato não possui parcelas.</p>
+                            ) : (
+                                <div className="overflow-x-auto rounded-lg border border-[#e8edf2]">
+                                    <table className="w-full min-w-[690px] text-left text-sm text-[#46566b]">
+                                        <thead className="bg-[#f6f8fa] text-xs uppercase text-[#092b5a]">
+                                            <tr>
+                                                <th className="px-4 py-3">Parcela</th>
+                                                <th className="px-4 py-3">Vencimento</th>
+                                                <th className="px-4 py-3">Valor</th>
+                                                <th className="px-4 py-3">Situação</th>
+                                                <th className="px-4 py-3 text-right">Recebimento</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-[#e8edf2]">
+                                            {parcelas.map((parcela, index) => {
+                                                const status = {
+                                                    PAGA: { label: 'Recebida', estilo: 'bg-[#eaf6f0] text-[#15966a]' },
+                                                    PENDENTE: { label: 'Pendente', estilo: 'bg-amber-50 text-amber-700' },
+                                                    ATRASADA: { label: 'Atrasada', estilo: 'bg-red-50 text-red-600' },
+                                                    CANCELADA: { label: 'Cancelada', estilo: 'bg-gray-100 text-gray-500' }
+                                                }[parcela.cobrancaStatus] || { label: parcela.cobrancaStatus, estilo: 'bg-gray-100 text-gray-600' };
+                                                const podeAlterar = parcela.cobrancaStatus !== 'CANCELADA';
+
+                                                return (
+                                                    <tr key={parcela.idCobranca} className="hover:bg-[#fcfdfd]">
+                                                        <td className="px-4 py-3">
+                                                            <strong className="block text-[#092b5a]">{index + 1} de {parcelas.length}</strong>
+                                                            <span className="text-xs text-[#748196]">{parcela.mesReferencia}</span>
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-4 py-3 text-xs">{new Date(`${parcela.dataVencimento}T00:00:00`).toLocaleDateString('pt-BR')}</td>
+                                                        <td className="whitespace-nowrap px-4 py-3 font-semibold text-[#092b5a]">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parcela.valor)}</td>
+                                                        <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${status.estilo}`}>{status.label}</span></td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            {podeAlterar ? (
+                                                                <button
+                                                                    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${parcela.cobrancaStatus === 'PAGA' ? 'text-[#46566b] hover:bg-[#f0f3f5]' : 'bg-[#15966a] text-white hover:bg-[#117a56]'}`}
+                                                                    type="button"
+                                                                    onClick={() => alterarStatusParcela(parcela)}
+                                                                    disabled={parcelaAtualizandoId === parcela.idCobranca}
+                                                                >
+                                                                    {parcelaAtualizandoId === parcela.idCobranca ? <Loader2 className="size-3.5 animate-spin" /> : parcela.cobrancaStatus === 'PAGA' ? <RotateCcw className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
+                                                                    {parcela.cobrancaStatus === 'PAGA' ? 'Marcar pendente' : 'Confirmar recebido'}
+                                                                </button>
+                                                            ) : <span className="text-xs text-[#8995a5]">Sem ação</span>}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </section>
                 </div>
             )}
 
