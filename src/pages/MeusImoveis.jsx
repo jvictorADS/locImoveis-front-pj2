@@ -10,13 +10,19 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 export function Imoveis() {
   const { token } = useAuth();
   const jwtToken = token || localStorage.getItem('token');
 
   const [imoveis, setImoveis] = useState([]);
+  const [locatarios, setLocatarios] = useState([]);
+  const [filtroLocatario, setFiltroLocatario] = useState('');
+  const [erroLocatarios, setErroLocatarios] = useState('');
+  const [erroImoveis, setErroImoveis] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingLocatarios, setIsLoadingLocatarios] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [fotoArquivo, setFotoArquivo] = useState(null);
 
@@ -41,10 +47,14 @@ export function Imoveis() {
   });
 
   // buscar imóveis do locador
-  const carregarImoveis = async () => {
+  const carregarImoveis = async (locatarioId = filtroLocatario) => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:8081/imoveis/me', {
+      setErroImoveis('');
+      const endpoint = locatarioId
+        ? `http://localhost:8081/imoveis/locatario/${locatarioId}`
+        : 'http://localhost:8081/imoveis/me';
+      const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -58,13 +68,31 @@ export function Imoveis() {
     } catch (error) {
       console.error("Erro ao carregar imóveis:", error);
       setImoveis([]);
+      setErroImoveis('Não foi possível carregar os imóveis. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const carregarLocatarios = async () => {
+    try {
+      setIsLoadingLocatarios(true);
+      const { data } = await api.get('/usuarios/tipo/LOCATARIO');
+      setLocatarios(data);
+      setErroLocatarios('');
+    } catch (error) {
+      console.error('Erro ao carregar inquilinos para filtro:', error);
+      setErroLocatarios('Não foi possível carregar os inquilinos para o filtro.');
+    } finally {
+      setIsLoadingLocatarios(false);
+    }
+  };
+
   useEffect(() => {
-    if (jwtToken) carregarImoveis();
+    if (jwtToken) {
+      carregarImoveis('');
+      carregarLocatarios();
+    }
   }, [jwtToken]);
 
   // envio de foto em Multipart
@@ -257,8 +285,35 @@ export function Imoveis() {
         </button>
       </div>
 
+      <div className="mb-5 max-w-sm">
+        <label htmlFor="filtro-inquilino-imoveis" className="mb-1.5 block text-xs font-semibold text-[#46566b]">
+          Filtrar imóveis por inquilino
+        </label>
+        <select
+          id="filtro-inquilino-imoveis"
+          value={filtroLocatario}
+          disabled={isLoadingLocatarios}
+          onChange={(event) => {
+            const locatarioId = event.target.value;
+            setFiltroLocatario(locatarioId);
+            carregarImoveis(locatarioId);
+          }}
+          className="w-full rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm text-[#092b5a] outline-none focus:border-[#15966a] disabled:opacity-60"
+        >
+          <option value="">Todos os imóveis</option>
+          {locatarios.map((locatario) => (
+            <option key={locatario.idUsuario} value={locatario.idUsuario}>{locatario.nomeCompleto}</option>
+          ))}
+        </select>
+        {erroLocatarios && <p className="mt-1 mb-0 text-xs text-[#eb5757]" role="alert">{erroLocatarios}</p>}
+      </div>
+
       {/* Lista de Imóveis */}
-      {imoveis.length === 0 ? (
+      {erroImoveis ? (
+        <section className="flex min-h-[250px] flex-col items-center justify-center rounded-[9px] border border-[#f2d8d8] bg-white px-5 py-8 text-center shadow-sm" role="alert">
+          <p className="m-0 text-sm font-semibold text-[#eb5757]">{erroImoveis}</p>
+        </section>
+      ) : imoveis.length === 0 ? (
         <section className="flex min-h-[310px] flex-col items-center justify-center rounded-[9px] border border-[#e8edf2] bg-white px-5 py-8 text-center shadow-sm">
           <span className="mb-[17px] grid size-[54px] place-items-center rounded-full bg-[#eaf6f0] text-[#15966a]">
             <Building2 className="size-6" />

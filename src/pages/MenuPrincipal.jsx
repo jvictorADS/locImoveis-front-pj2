@@ -12,6 +12,7 @@ import {
   Wrench,
   AlertCircle,
   AlertTriangle,
+  Filter,
   Loader2,
   Users,
   ChevronRight
@@ -310,9 +311,21 @@ export function MenuPrincipal() {
 export function Dashboard() {
   const [metricas, setMetricas] = useState(null);
   const [inadimplentes, setInadimplentes] = useState([]);
+  const [locatarios, setLocatarios] = useState([]);
+  const [imoveis, setImoveis] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingFiltros, setIsLoadingFiltros] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [filtrosError, setFiltrosError] = useState('');
   const [tentativa, setTentativa] = useState(0);
+  const [filtros, setFiltros] = useState({
+    dataInicio: '',
+    dataFim: '',
+    locatarioId: '',
+    imovelId: '',
+    status: '',
+  });
+  const [filtrosAplicados, setFiltrosAplicados] = useState({});
 
   const today = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -321,23 +334,77 @@ export function Dashboard() {
   }).format(new Date());
 
   useEffect(() => {
+    let cancelado = false;
+
+    async function carregarOpcoesFiltro() {
+      try {
+        setIsLoadingFiltros(true);
+        setFiltrosError('');
+        const [locatariosResponse, imoveisResponse] = await Promise.all([
+          api.get('/usuarios/tipo/LOCATARIO'),
+          api.get('/imoveis/me'),
+        ]);
+        if (cancelado) return;
+        setLocatarios(locatariosResponse.data);
+        setImoveis(imoveisResponse.data);
+      } catch (error) {
+        if (!cancelado) {
+          console.error('Erro ao carregar opções de filtro do dashboard:', error);
+          setFiltrosError('Não foi possível carregar as opções de inquilinos e imóveis.');
+        }
+      } finally {
+        if (!cancelado) setIsLoadingFiltros(false);
+      }
+    }
+
+    carregarOpcoesFiltro();
+    return () => { cancelado = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+
     async function carregarDashboard() {
       try {
         setIsLoading(true);
         setLoadError('');
-        const { data } = await api.get('/dashboard');
+        const { data } = await api.get('/dashboard', { params: filtrosAplicados });
+        if (cancelado) return;
         setMetricas(data);
         setInadimplentes(data.inadimplentes ?? []);
       } catch (error) {
-        console.error("Erro ao carregar dados do dashboard:", error);
-        setLoadError('Não foi possível carregar o painel financeiro. Verifique sua conexão e tente novamente.');
+        if (!cancelado) {
+          console.error("Erro ao carregar dados do dashboard:", error);
+          setLoadError(error.response?.status === 400
+            ? 'Os filtros informados são inválidos. Confira as datas e tente novamente.'
+            : 'Não foi possível carregar o painel financeiro. Verifique sua conexão e tente novamente.');
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelado) setIsLoading(false);
       }
     }
 
     carregarDashboard();
-  }, [tentativa]);
+    return () => { cancelado = true; };
+  }, [tentativa, filtrosAplicados]);
+
+  const aplicarFiltros = (event) => {
+    event.preventDefault();
+    if (filtros.dataInicio && filtros.dataFim && filtros.dataInicio > filtros.dataFim) {
+      setFiltrosError('A data inicial não pode ser posterior à data final.');
+      return;
+    }
+    setFiltrosError('');
+    setFiltrosAplicados(Object.fromEntries(
+      Object.entries(filtros).filter(([, valor]) => valor !== ''),
+    ));
+  };
+
+  const limparFiltros = () => {
+    setFiltros({ dataInicio: '', dataFim: '', locatarioId: '', imovelId: '', status: '' });
+    setFiltrosAplicados({});
+    setFiltrosError('');
+  };
 
   const formatarMoeda = (valor) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
@@ -374,6 +441,95 @@ export function Dashboard() {
         </div>
         <time className="pb-[3px] text-xs text-[#7b8797] capitalize max-[700px]:text-[11px]" dateTime={new Date().toISOString().slice(0, 10)}>{today}</time>
       </div>
+
+      <form onSubmit={aplicarFiltros} className="mb-8 rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <Filter className="size-4 text-[#15966a]" aria-hidden="true" />
+          <h2 className="m-0 text-sm font-bold text-[#092b5a]">Filtrar dados do dashboard</h2>
+        </div>
+        <div className="grid grid-cols-5 gap-3 max-[1050px]:grid-cols-3 max-[700px]:grid-cols-1">
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Data inicial
+            <input
+              type="date"
+              value={filtros.dataInicio}
+              max={filtros.dataFim || undefined}
+              onChange={(event) => setFiltros({ ...filtros, dataInicio: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Data final
+            <input
+              type="date"
+              value={filtros.dataFim}
+              min={filtros.dataInicio || undefined}
+              onChange={(event) => setFiltros({ ...filtros, dataFim: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Inquilino
+            <select
+              value={filtros.locatarioId}
+              onChange={(event) => setFiltros({ ...filtros, locatarioId: event.target.value })}
+              disabled={isLoadingFiltros}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a] disabled:opacity-60"
+            >
+              <option value="">Todos os inquilinos</option>
+              {locatarios.map((locatario) => (
+                <option key={locatario.idUsuario} value={locatario.idUsuario}>{locatario.nomeCompleto}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Imóvel
+            <select
+              value={filtros.imovelId}
+              onChange={(event) => setFiltros({ ...filtros, imovelId: event.target.value })}
+              disabled={isLoadingFiltros}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a] disabled:opacity-60"
+            >
+              <option value="">Todos os imóveis</option>
+              {imoveis.map((imovel) => (
+                <option key={imovel.idImovel} value={imovel.idImovel}>
+                  {imovel.endereco || `Imóvel #${imovel.idImovel}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Status da cobrança
+            <select
+              value={filtros.status}
+              onChange={(event) => setFiltros({ ...filtros, status: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            >
+              <option value="">Todos os status</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="PAGA">Paga</option>
+              <option value="ATRASADA">Atrasada</option>
+              <option value="CANCELADA">Cancelada</option>
+            </select>
+          </label>
+        </div>
+        {filtrosError && <p className="mt-3 mb-0 text-xs text-[#eb5757]" role="alert">{filtrosError}</p>}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={limparFiltros}
+            className="cursor-pointer rounded-md border border-[#dce3eb] bg-white px-4 py-2 text-xs font-semibold text-[#46566b] hover:bg-[#f6f8fa]"
+          >
+            Limpar filtros
+          </button>
+          <button
+            type="submit"
+            className="cursor-pointer rounded-md border-0 bg-[#15966a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#117a56]"
+          >
+            Aplicar filtros
+          </button>
+        </div>
+      </form>
 
       {/* Banner de Boas-Vindas */}
       <section className="relative flex min-h-[204px] items-center overflow-hidden rounded-[10px] bg-[#092b5a] px-9 py-[30px] text-white mb-8 after:absolute after:-top-[220px] after:right-[115px] after:size-[370px] after:rounded-full after:border after:border-[#ffffff13] after:content-[''] after:shadow-[0_0_0_35px_#ffffff08,0_0_0_70px_#ffffff05] max-[700px]:min-h-[190px] max-[700px]:px-5 max-[700px]:py-6">
