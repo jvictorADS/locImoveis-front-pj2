@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -14,7 +14,11 @@ import {
   AlertTriangle,
   Loader2,
   Users,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  Pencil,
+  X,
+  Save
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -235,11 +239,81 @@ export function MenuPrincipal() {
   const navigate = useNavigate();
   const location = useLocation();
   const activeSection = sections.find((section) => section.path === location.pathname);
+  const accountMenuRef = useRef(null);
+  const [user, setUser] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState('');
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({ nomeCompleto: '', cpf: '', telefone: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState('');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(({ data }) => setUser(data))
+      .catch((error) => {
+        console.error('Erro ao carregar o perfil:', error);
+        setProfileLoadError('Não foi possível carregar os dados do perfil.');
+      })
+      .finally(() => setProfileLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) return undefined;
+
+    const fecharAoClicarFora = (event) => {
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    const fecharComEscape = (event) => {
+      if (event.key === 'Escape') setIsProfileMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', fecharAoClicarFora);
+    document.addEventListener('keydown', fecharComEscape);
+    return () => {
+      document.removeEventListener('pointerdown', fecharAoClicarFora);
+      document.removeEventListener('keydown', fecharComEscape);
+    };
+  }, [isProfileMenuOpen]);
+
+  const abrirEdicaoPerfil = () => {
+    setProfileForm({
+      nomeCompleto: user?.nomeCompleto || '',
+      cpf: user?.cpf || '',
+      telefone: user?.telefone || '',
+    });
+    setProfileSaveError('');
+    setIsProfileMenuOpen(false);
+    setIsEditProfileOpen(true);
+  };
+
+  const salvarPerfil = async (event) => {
+    event.preventDefault();
+    setProfileSaving(true);
+    setProfileSaveError('');
+
+    try {
+      const { data } = await api.put('/auth/me', profileForm);
+      setUser(data);
+      setIsEditProfileOpen(false);
+    } catch (error) {
+      setProfileSaveError(error.response?.data?.mensagem || error.response?.data?.message || 'Não foi possível salvar as alterações.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const nomeExibido = user?.nomeCompleto || 'Proprietário';
+  const inicialUsuario = nomeExibido.charAt(0).toUpperCase();
+  const tipoUsuario = user?.tipoUsuario === 'LOCATARIO' ? 'Locatário' : 'Proprietário';
 
   return (
     <div className="flex min-h-screen bg-[#f6f8fa] text-[#18304d] max-[700px]:block">
@@ -267,8 +341,8 @@ export function MenuPrincipal() {
 
         <div className="mt-auto">
           <div className="flex items-center gap-[10px] border-t border-[#ffffff20] px-2 pt-[14px] pb-[18px]">
-            <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[#d9eee5] bg-[#e8f6ef] text-xs font-extrabold text-[#092b5a]">L</span>
-            <span className="grid gap-[3px]"><strong className="text-xs text-white">Minha conta</strong><small className="text-[11px] text-[#b3c3d7]">Proprietário</small></span>
+            <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[#d9eee5] bg-[#e8f6ef] text-xs font-extrabold text-[#092b5a]">{inicialUsuario}</span>
+            <span className="grid min-w-0 gap-[3px]"><strong className="truncate text-xs text-white">{nomeExibido}</strong><small className="text-[11px] text-[#b3c3d7]">{tipoUsuario}</small></span>
           </div>
           <button className="flex w-full cursor-pointer items-center gap-[11px] rounded-[7px] border-0 bg-transparent px-[10px] py-[11px] text-left text-xs text-[#d7e0ec] hover:bg-[#ffffff12] hover:text-white" type="button" onClick={handleLogout}>
             <LogOut className="size-[17px]" aria-hidden="true" />
@@ -286,11 +360,97 @@ export function MenuPrincipal() {
           <div className="flex items-center gap-[10px] text-xs text-[#8995a5] max-[700px]:hidden">
             <span>Loc Imóveis</span><span aria-hidden="true">/</span><strong className="font-bold text-[#092b5a]">{activeSection?.label}</strong>
           </div>
-          <div className="flex items-center gap-[9px] text-xs font-semibold text-[#46566b] max-[700px]:text-[0px]"><span className="grid size-[30px] shrink-0 place-items-center rounded-full border border-[#d9eee5] bg-[#e8f6ef] text-xs font-extrabold text-[#092b5a]">L</span><span>Proprietário</span></div>
-          <button className="hidden size-8 cursor-pointer place-items-center rounded-[7px] border-0 bg-transparent text-[#092b5a] hover:bg-[#f0f4f6] max-[700px]:grid" type="button" onClick={handleLogout} aria-label="Sair da conta" title="Sair da conta">
-            <LogOut className="size-[17px]" aria-hidden="true" />
-          </button>
+          <div className="relative ml-auto" ref={accountMenuRef}>
+            <button
+              className="flex cursor-pointer items-center gap-[9px] rounded-lg border-0 bg-transparent px-2 py-1.5 text-left text-xs font-semibold text-[#46566b] hover:bg-[#f0f4f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#15966a]"
+              type="button"
+              onClick={() => setIsProfileMenuOpen((aberto) => !aberto)}
+              aria-expanded={isProfileMenuOpen}
+              aria-haspopup="menu"
+              aria-label={`Abrir opções do perfil de ${nomeExibido}`}
+            >
+              <span className="grid size-[30px] shrink-0 place-items-center rounded-full border border-[#d9eee5] bg-[#e8f6ef] text-xs font-extrabold text-[#092b5a]">{inicialUsuario}</span>
+              <span className="max-w-[180px] truncate max-[700px]:hidden">{nomeExibido}</span>
+              <ChevronDown className={`size-4 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[290px] overflow-hidden rounded-xl border border-[#e8edf2] bg-white text-left shadow-[0_12px_35px_#092b5a20]" role="menu" aria-label="Menu do perfil">
+                <div className="border-b border-[#e8edf2] px-4 py-4">
+                  <p className="m-0 truncate text-sm font-bold text-[#092b5a]">{nomeExibido}</p>
+                  <p className="mt-1 truncate text-xs text-[#748196]">{user?.email || (profileLoading ? 'Carregando perfil...' : profileLoadError || tipoUsuario)}</p>
+                  {user?.email && <p className="mt-1 text-[11px] text-[#748196]">{tipoUsuario}</p>}
+                </div>
+                <div className="p-2">
+                  <button
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-[13px] font-medium text-[#18304d] hover:bg-[#f4f7f9] disabled:cursor-not-allowed disabled:opacity-50"
+                    type="button"
+                    role="menuitem"
+                    onClick={abrirEdicaoPerfil}
+                    disabled={!user}
+                  >
+                    <Pencil className="size-4 text-[#748196]" aria-hidden="true" />
+                    Editar perfil
+                  </button>
+                  <button
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-[13px] font-medium text-[#b42318] hover:bg-[#fff3f2]"
+                    type="button"
+                    role="menuitem"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="size-4" aria-hidden="true" />
+                    Sair da conta
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </header>
+
+        {isEditProfileOpen && (
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-[#092b5a70] px-4 py-6" onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !profileSaving) setIsEditProfileOpen(false);
+          }}>
+            <section className="w-full max-w-[470px] rounded-xl bg-white p-6 shadow-2xl max-[500px]:p-5" role="dialog" aria-modal="true" aria-labelledby="editar-perfil-titulo">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="editar-perfil-titulo" className="m-0 text-lg font-bold text-[#092b5a]">Editar perfil</h2>
+                  <p className="mt-1 text-xs text-[#748196]">Atualize seus dados pessoais.</p>
+                </div>
+                <button className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-md border-0 bg-transparent text-[#748196] hover:bg-[#f0f4f6]" type="button" onClick={() => setIsEditProfileOpen(false)} disabled={profileSaving} aria-label="Fechar edição de perfil">
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              <form className="grid gap-4" onSubmit={salvarPerfil}>
+                <label className="grid gap-1.5 text-xs font-semibold text-[#46566b]">
+                  Nome completo
+                  <input className="h-10 rounded-md border border-[#dce3eb] px-3 text-sm font-normal text-[#18304d] outline-none focus:border-[#15966a] focus:ring-2 focus:ring-[#15966a20]" required maxLength={120} value={profileForm.nomeCompleto} onChange={(event) => setProfileForm({ ...profileForm, nomeCompleto: event.target.value })} />
+                </label>
+                <label className="grid gap-1.5 text-xs font-semibold text-[#46566b]">
+                  CPF
+                  <input className="h-10 rounded-md border border-[#dce3eb] px-3 text-sm font-normal text-[#18304d] outline-none focus:border-[#15966a] focus:ring-2 focus:ring-[#15966a20]" required maxLength={14} value={profileForm.cpf} onChange={(event) => setProfileForm({ ...profileForm, cpf: event.target.value })} />
+                </label>
+                <label className="grid gap-1.5 text-xs font-semibold text-[#46566b]">
+                  Telefone
+                  <input className="h-10 rounded-md border border-[#dce3eb] px-3 text-sm font-normal text-[#18304d] outline-none focus:border-[#15966a] focus:ring-2 focus:ring-[#15966a20]" required maxLength={20} value={profileForm.telefone} onChange={(event) => setProfileForm({ ...profileForm, telefone: event.target.value })} />
+                </label>
+                <label className="grid gap-1.5 text-xs font-semibold text-[#46566b]">
+                  E-mail
+                  <input className="h-10 cursor-not-allowed rounded-md border border-[#e8edf2] bg-[#f6f8fa] px-3 text-sm font-normal text-[#748196]" value={user?.email || ''} disabled />
+                  <span className="text-[11px] font-normal text-[#8995a5]">O e-mail de acesso não pode ser alterado por aqui.</span>
+                </label>
+                {profileSaveError && <p className="m-0 rounded-md bg-[#fff3f2] px-3 py-2 text-xs text-[#b42318]" role="alert">{profileSaveError}</p>}
+                <div className="mt-1 flex justify-end gap-2">
+                  <button className="cursor-pointer rounded-md border border-[#dce3eb] bg-white px-4 py-2 text-xs font-semibold text-[#46566b] hover:bg-[#f6f8fa]" type="button" onClick={() => setIsEditProfileOpen(false)} disabled={profileSaving}>Cancelar</button>
+                  <button className="inline-flex cursor-pointer items-center gap-2 rounded-md border-0 bg-[#15966a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#117a56] disabled:cursor-wait disabled:opacity-70" type="submit" disabled={profileSaving}>
+                    {profileSaving ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
+                    {profileSaving ? 'Salvando...' : 'Salvar alterações'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
 
         {/* Menu Responsivo Mobile com 5 Colunas */}
         <nav className="hidden grid-cols-6 gap-0 border-b border-[#e8edf2] bg-white px-2 pt-[7px] max-[700px]:grid" aria-label="Seções principais">
