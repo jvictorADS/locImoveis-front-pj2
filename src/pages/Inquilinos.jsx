@@ -9,7 +9,11 @@ import {
     Search,
     ShieldAlert,
     CheckCircle2,
-    Ban
+    Ban,
+    ChevronDown,
+    Building2,
+    Calendar,
+    MapPin
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,35 +31,107 @@ export function Inquilinos() {
     const jwtToken = token || localStorage.getItem('token');
 
     const [inquilinos, setInquilinos] = useState([]);
+    const [contratos, setContratos] = useState([]);
+    const [imoveis, setImoveis] = useState([]);
+    const [expandedInquilinoId, setExpandedInquilinoId] = useState(null);
+    const [loadingImoveisIds, setLoadingImoveisIds] = useState(false);
+
     const [filtro, setFiltro] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Modais e Estados do Formulário
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [inquilinoEditando, setInquilinoEditando] = useState(null);
     const [formData, setFormData] = useState(formVazio);
 
-    const carregarInquilinos = async () => {
+    const extrairLista = (data) => {
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.content)) return data.content;
+        return [];
+    };
+
+    const carregarDados = async () => {
         try {
             setIsLoading(true);
-            const response = await fetch('http://localhost:8081/usuarios/tipo/LOCATARIO', {
-                headers: { 'Authorization': `Bearer ${jwtToken}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setInquilinos(data);
+            const headers = { 'Authorization': `Bearer ${jwtToken}` };
+
+            const [resInquilinos, resContratos, resImoveis] = await Promise.all([
+                fetch('http://localhost:8081/usuarios/tipo/LOCATARIO', { headers }),
+                fetch('http://localhost:8081/contratos', { headers }),
+                fetch('http://localhost:8081/imoveis', { headers }).catch(() => ({ ok: false }))
+            ]);
+
+            if (resInquilinos.ok) {
+                setInquilinos(extrairLista(await resInquilinos.json()));
+            }
+            if (resContratos.ok) {
+                setContratos(extrairLista(await resContratos.json()));
+            }
+            if (resImoveis.ok) {
+                setImoveis(extrairLista(await resImoveis.json()));
             }
         } catch (error) {
-            console.error("Erro ao carregar inquilinos:", error);
+            console.error("Erro ao carregar dados de inquilinos:", error);
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        carregarInquilinos();
+        carregarDados();
     }, []);
+
+    const obterContratosDoInquilino = (inquilinoId) => {
+        return contratos
+            .filter((c) => {
+                const locId = c.locatarioId ?? c.locatario?.idUsuario ?? c.locatario?.id;
+                return Number(locId) === Number(inquilinoId);
+            })
+            .sort((a, b) => {
+                if (a.contratoStatus === 'ATIVO' && b.contratoStatus !== 'ATIVO') return -1;
+                if (a.contratoStatus !== 'ATIVO' && b.contratoStatus === 'ATIVO') return 1;
+                return new Date(b.dataInicio || 0) - new Date(a.dataInicio || 0);
+            });
+    };
+
+    const toggleExpandirInquilino = async (id) => {
+        if (expandedInquilinoId === id) {
+            setExpandedInquilinoId(null);
+            return;
+        }
+        setExpandedInquilinoId(id);
+        const contratosDoInquilino = obterContratosDoInquilino(id);
+        const idsFaltantes = [
+            ...new Set(
+                contratosDoInquilino
+                    .map((c) => c.imovelId ?? c.imovel?.idImovel ?? c.imovel?.id)
+                    .filter((imId) => imId != null)
+            )
+        ].filter(
+            (imId) => !imoveis.some((im) => Number(im.idImovel ?? im.id ?? im.imovelId) === Number(imId))
+        );
+
+        if (idsFaltantes.length > 0) {
+            try {
+                setLoadingImoveisIds(true);
+                const headers = { 'Authorization': `Bearer ${jwtToken}` };
+                const respostas = await Promise.all(
+                    idsFaltantes.map((imId) =>
+                        fetch(`http://localhost:8081/imoveis/${imId}`, { headers })
+                            .then((res) => (res.ok ? res.json() : null))
+                            .catch(() => null)
+                    )
+                );
+
+                const novosImoveis = respostas.filter(Boolean);
+                if (novosImoveis.length > 0) {
+                    setImoveis((prev) => [...prev, ...novosImoveis]);
+                }
+            } finally {
+                setLoadingImoveisIds(false);
+            }
+        }
+    };
 
     const abrirModalNovo = () => {
         setInquilinoEditando(null);
@@ -122,7 +198,7 @@ export function Inquilinos() {
             }
 
             setIsModalOpen(false);
-            carregarInquilinos();
+            carregarDados();
         } catch (error) {
             alert(`Falha na operação: ${error.message}`);
         } finally {
@@ -140,11 +216,92 @@ export function Inquilinos() {
             });
 
             if (!response.ok) throw new Error("Erro ao excluir inquilino.");
-            carregarInquilinos();
+            carregarDados();
         } catch (error) {
             alert(error.message);
         }
     };
+
+    const formatarData = (dataStr) => {
+        if (!dataStr) return 'N/I';
+        const partes = dataStr.split('T')[0].split('-');
+        if (partes.length === 3) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+        return dataStr;
+    };
+
+    const formatarMoeda = (valor) =>
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+
+    const extrairEnderecoCampoUnico = (obj) => {
+        if (!obj) return '';
+        if (typeof obj === 'string') return obj.trim();
+        const valor =
+            obj.endereco ||
+            obj.enderecoCompleto ||
+            obj.enderecoImovel ||
+            obj.imovelEndereco ||
+            obj.localizacao ||
+            '';
+        return typeof valor === 'string' ? valor.trim() : '';
+    };
+
+    const obterDetalhesImovel = (contrato) => {
+        const imovelId = contrato.imovelId ?? contrato.imovel?.idImovel ?? contrato.imovel?.id;
+        const imovelEncontrado = imoveis.find(
+            (im) => Number(im.idImovel ?? im.id ?? im.imovelId) === Number(imovelId)
+        );
+
+        const endereco =
+            extrairEnderecoCampoUnico(contrato) ||
+            extrairEnderecoCampoUnico(contrato.imovel) ||
+            extrairEnderecoCampoUnico(imovelEncontrado);
+
+        const tipoOuTitulo =
+            imovelEncontrado?.titulo ||
+            imovelEncontrado?.nome ||
+            imovelEncontrado?.tipoImovel ||
+            contrato.imovel?.tipoImovel;
+
+        return {
+            enderecoPrincipal: endereco || `Imóvel #${imovelId}`,
+            subtitulo: endereco
+                ? [tipoOuTitulo, imovelId ? `Imóvel #${imovelId}` : null].filter(Boolean).join(' • ')
+                : ''
+        };
+    };
+
+    const renderContratoStatusBadge = (status) => {
+    const st = status ? status.toUpperCase() : 'INATIVO';
+    switch (st) {
+        case 'ATIVO':
+            return (
+                <span className="inline-flex items-center rounded-full bg-[#eaf6f0] px-2.5 py-0.5 text-[11px] font-bold text-[#15966a]">
+                    Contrato Ativo
+                </span>
+            );
+        case 'FINALIZADO':
+        case 'ENCERRADO':
+            return (
+                <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-600">
+                    Encerrado
+                </span>
+            );
+        case 'RESCINDIDO':
+            return (
+                <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-600">
+                    Rescindido
+                </span>
+            );
+        default:
+            return (
+                <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-bold text-gray-600">
+                    {st}
+                </span>
+            );
+    }
+};
 
     const renderStatusBadge = (status) => {
         const st = status ? status.toUpperCase() : 'INATIVA';
@@ -240,34 +397,134 @@ export function Inquilinos() {
                         <tbody className="divide-y divide-[#e8edf2]">
                             {inquilinosFiltrados.map((inquilino) => {
                                 const id = inquilino.idUsuario || inquilino.id;
+                                const isExpanded = expandedInquilinoId === id;
+                                const contratosInquilino = obterContratosDoInquilino(id);
+
                                 return (
-                                    <tr key={id} className="hover:bg-[#fcfdfd] transition-colors">
-                                        <td className="px-5 py-3.5">
-                                            <div className="font-semibold text-[#092b5a]">{inquilino.nomeCompleto}</div>
-                                            <div className="text-xs text-[#748196]">{inquilino.email}</div>
-                                        </td>
-                                        <td className="px-4 py-3.5 text-xs font-mono text-[#092b5a]">{inquilino.cpf || 'N/I'}</td>
-                                        <td className="px-4 py-3.5 text-xs text-[#46566b]">{inquilino.telefone || 'N/I'}</td>
-                                        <td className="px-4 py-3.5">{renderStatusBadge(inquilino.contaStatus)}</td>
-                                        <td className="px-4 py-3.5 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button
-                                                    onClick={() => abrirModalEdicao(inquilino)}
-                                                    title="Editar Inquilino"
-                                                    className="p-1.5 text-[#092b5a] hover:bg-[#e8edf2] rounded-md transition-colors"
-                                                >
-                                                    <Pencil className="size-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleExcluir(id)}
-                                                    title="Excluir Inquilino"
-                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <React.Fragment key={id}>
+                                        <tr className={`transition-colors ${isExpanded ? 'bg-[#f8fafc]' : 'hover:bg-[#fcfdfd]'}`}>
+                                            <td className="px-5 py-3.5">
+                                                <div className="font-semibold text-[#092b5a]">{inquilino.nomeCompleto}</div>
+                                                <div className="text-xs text-[#748196]">{inquilino.email}</div>
+                                            </td>
+                                            <td className="px-4 py-3.5 text-xs font-mono text-[#092b5a]">{inquilino.cpf || 'N/I'}</td>
+                                            <td className="px-4 py-3.5 text-xs text-[#46566b]">{inquilino.telefone || 'N/I'}</td>
+                                            <td className="px-4 py-3.5">{renderStatusBadge(inquilino.contaStatus)}</td>
+                                            <td className="px-4 py-3.5 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => abrirModalEdicao(inquilino)}
+                                                        title="Editar Inquilino"
+                                                        className="p-1.5 text-[#092b5a] hover:bg-[#e8edf2] rounded-md transition-colors"
+                                                    >
+                                                        <Pencil className="size-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleExcluir(id)}
+                                                        title="Excluir Inquilino"
+                                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </button>
+
+                                                    <span className="mx-1 h-4 w-px bg-[#e8edf2]" aria-hidden="true" />
+
+                                                    <button
+                                                        onClick={() => toggleExpandirInquilino(id)}
+                                                        title={isExpanded ? "Ocultar imóveis alugados" : "Ver imóveis alugados"}
+                                                        className={`inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+                                                            isExpanded
+                                                                ? 'bg-[#eaf6f0] text-[#15966a]'
+                                                                : 'text-[#46566b] hover:bg-[#e8edf2] hover:text-[#092b5a]'
+                                                        }`}
+                                                    >
+                                                        <Building2 className="size-3.5" />
+                                                        <span>{contratosInquilino.length}</span>
+                                                        <ChevronDown
+                                                            className={`size-4 transition-transform duration-200 ${
+                                                                isExpanded ? 'rotate-180' : ''
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        {/* ÁREA EXPANSÍVEL COM HISTÓRICO DE IMÓVEIS DO INQUILINO */}
+                                        {isExpanded && (
+                                            <tr className="bg-[#f8fafc]">
+                                                <td colSpan={5} className="px-5 py-4">
+                                                    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+                                                        <div className="mb-3 flex items-center justify-between">
+                                                            <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#092b5a]">
+                                                                <Building2 className="size-4 text-[#15966a]" />
+                                                                Histórico de Imóveis e Locações
+                                                            </h3>
+                                                            <span className="text-xs text-[#748196]">
+                                                                {contratosInquilino.length}{' '}
+                                                                {contratosInquilino.length === 1 ? 'registro' : 'registros'}
+                                                            </span>
+                                                        </div>
+
+                                                        {loadingImoveisIds ? (
+                                                            <div className="flex items-center justify-center gap-2 py-4 text-xs text-[#748196]">
+                                                                <Loader2 className="size-4 animate-spin text-[#15966a]" />
+                                                                <span>Carregando endereços dos imóveis...</span>
+                                                            </div>
+                                                        ) : contratosInquilino.length === 0 ? (
+                                                            <p className="py-3 text-center text-xs text-[#748196]">
+                                                                Este inquilino ainda não possui imóveis ou contratos vinculados.
+                                                            </p>
+                                                        ) : (
+                                                            <div className="grid gap-2.5">
+                                                                {contratosInquilino.map((contrato) => {
+                                                                    const { enderecoPrincipal, subtitulo } = obterDetalhesImovel(contrato);
+                                                                    const contratoId = contrato.idContrato || contrato.id;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={contratoId}
+                                                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#edf2f7] bg-[#fcfdfd] px-3.5 py-2.5"
+                                                                        >
+                                                                            <div className="flex items-start gap-2.5">
+                                                                                <MapPin className="mt-0.5 size-4 shrink-0 text-[#15966a]" />
+                                                                                <div>
+                                                                                    <div className="text-sm font-bold text-[#092b5a]">
+                                                                                        {enderecoPrincipal}
+                                                                                    </div>
+                                                                                    {subtitulo && (
+                                                                                        <div className="text-xs text-[#748196]">
+                                                                                            {subtitulo}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <div className="flex flex-wrap items-center gap-4 text-xs">
+                                                                                <div className="flex items-center gap-1.5 text-[#46566b]">
+                                                                                    <Calendar className="size-3.5 text-[#8995a5]" />
+                                                                                    <span>
+                                                                                        {formatarData(contrato.dataInicio)} até{' '}
+                                                                                        {formatarData(contrato.dataFim)}
+                                                                                    </span>
+                                                                                </div>
+
+                                                                                <div className="font-semibold text-[#092b5a]">
+                                                                                    {formatarMoeda(contrato.valorAcordado)}
+                                                                                </div>
+
+                                                                                {renderContratoStatusBadge(contrato.contratoStatus)}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 );
                             })}
                         </tbody>
