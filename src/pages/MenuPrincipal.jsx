@@ -14,11 +14,11 @@ import {
   AlertTriangle,
   Loader2,
   Users,
-  ChevronRight,
   ChevronDown,
   Pencil,
   X,
-  Save
+  Save,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
@@ -97,7 +97,7 @@ const sectionDetails = {
   },
 };
 
-function GraficoFluxoCaixa({ dados, formatarMoeda }) {
+function GraficoFluxoCaixa({ dados, formatarMoeda, mesSelecionado, onSelecionarMes }) {
   const [periodo, setPeriodo] = useState(6);
   const meses = Array.isArray(dados) ? dados.slice(-periodo) : [];
   const series = [
@@ -105,6 +105,7 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
     { chave: 'gastosReformas', nome: 'Reformas/Despesas', cor: '#f2c94c' },
     { chave: 'inadimplencia', nome: 'Inadimplência', cor: '#eb5757' },
   ];
+
   const valores = meses.flatMap((mes) => series.map(({ chave }) => Number(mes[chave]) || 0));
   const maiorValor = Math.max(...valores, 0);
   const limite = maiorValor > 0 ? maiorValor * 1.1 : 1000;
@@ -116,18 +117,21 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
   const larguraGrupo = meses.length ? larguraGrafico / meses.length : 0;
   const larguraBarra = Math.min(18, larguraGrupo * 0.18);
   const espacoBarras = Math.min(5, larguraGrupo * 0.04);
+
   const formatarEixo = (valor) => new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(valor);
+
   const formatarMes = (mes) => {
     const data = new Date(`${mes.mes}-01T12:00:00`);
     const nomeMes = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(data).replace('.', '');
     const ano = new Intl.DateTimeFormat('pt-BR', { year: '2-digit' }).format(data);
     return `${nomeMes}/${ano}`;
   };
+
   const temMovimentacao = valores.some((valor) => valor > 0);
 
   return (
@@ -135,7 +139,9 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-[16px] font-bold text-[#092b5a]">Fluxo de Caixa e Ocorrências</h2>
-          <p className="mt-1 text-[13px] text-[#748196]">Recebimentos, gastos de manutenção e valores em atraso agrupados por mês.</p>
+          <p className="mt-1 text-[13px] text-[#748196]">
+            Recebimentos, gastos de manutenção e valores em atraso agrupados por mês. Clique em um mês para filtrar.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Período do gráfico">
           {[6, 12].map((quantidade) => (
@@ -172,25 +178,48 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
               aria-describedby="grafico-fluxo-descricao"
             >
               <title id="grafico-fluxo-titulo">Fluxo de caixa nos últimos {periodo} meses</title>
-              <desc id="grafico-fluxo-descricao">Gráfico de barras agrupadas. Cada barra pode ser focada para consultar o valor exato.</desc>
+              <desc id="grafico-fluxo-descricao">Gráfico de barras agrupadas. Clique ou foque em um mês para filtrar os indicadores.</desc>
               {[0, 1, 2, 3, 4].map((marcador) => {
                 const valor = (limite * marcador) / 4;
                 const y = margem.topo + alturaGrafico - (alturaGrafico * marcador) / 4;
                 return (
                   <g key={marcador}>
-                    <line x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} stroke="#e8edf2" strokeDasharray={marcador === 0 ? undefined : '4 4'} />
-                    <text x={margem.esquerda - 10} y={y + 4} textAnchor="end" fill="#748196" fontSize="11">{formatarEixo(valor)}</text>
+                    <line
+                      x1={margem.esquerda}
+                      x2={largura - margem.direita}
+                      y1={y}
+                      y2={y}
+                      stroke="#e8edf2"
+                      strokeDasharray={marcador === 0 ? undefined : '4 4'}
+                    />
+                    <text x={margem.esquerda - 10} y={y + 4} textAnchor="end" fill="#748196" fontSize="11">
+                      {formatarEixo(valor)}
+                    </text>
                   </g>
                 );
               })}
               {meses.map((mes, indice) => {
                 const centroGrupo = margem.esquerda + larguraGrupo * (indice + 0.5);
-                const larguraTotal = (larguraBarra * series.length) + (espacoBarras * (series.length - 1));
-                const inicioGrupo = centroGrupo - (larguraTotal / 2);
+                const larguraTotal = larguraBarra * series.length + espacoBarras * (series.length - 1);
+                const inicioGrupo = centroGrupo - larguraTotal / 2;
+                const isSelecionado = mesSelecionado === mes.mes;
+
                 return (
                   <g key={mes.mes}>
+                    {isSelecionado && (
+                      <rect
+                        x={margem.esquerda + larguraGrupo * indice + 4}
+                        y={margem.topo}
+                        width={Math.max(larguraGrupo - 8, 0)}
+                        height={alturaGrafico}
+                        rx="6"
+                        fill="#092b5a"
+                        fillOpacity="0.05"
+                      />
+                    )}
                     {series.map(({ chave, nome, cor }, serieIndice) => {
                       const valor = Number(mes[chave]) || 0;
+                      if (valor <= 0) return null;
                       const alturaBarra = (valor / limite) * alturaGrafico;
                       const x = inicioGrupo + serieIndice * (larguraBarra + espacoBarras);
                       const y = margem.topo + alturaGrafico - alturaBarra;
@@ -200,18 +229,30 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
                           x={x}
                           y={y}
                           width={larguraBarra}
-                          height={Math.max(alturaBarra, 0)}
+                          height={alturaBarra}
                           rx="3"
                           fill={cor}
                           tabIndex="0"
+                          onClick={() => onSelecionarMes?.(mes.mes)}
                           aria-label={`${formatarMes(mes)}: ${nome}, ${formatarMoeda(valor)}`}
-                          className="focus:stroke-[#15966a] focus:stroke-[3px]"
+                          className="cursor-pointer transition-opacity hover:opacity-85 focus:stroke-[#15966a] focus:stroke-[3px]"
                         >
                           <title>{`${formatarMes(mes)} — ${nome}: ${formatarMoeda(valor)}`}</title>
                         </rect>
                       );
                     })}
-                    <text x={centroGrupo} y={altura - 12} textAnchor="middle" fill="#748196" fontSize="11">{formatarMes(mes)}</text>
+                    <text
+                      x={centroGrupo}
+                      y={altura - 12}
+                      textAnchor="middle"
+                      fill={isSelecionado ? '#092b5a' : '#748196'}
+                      fontWeight={isSelecionado ? '700' : '400'}
+                      fontSize="11"
+                      className="cursor-pointer"
+                      onClick={() => onSelecionarMes?.(mes.mes)}
+                    >
+                      {formatarMes(mes)}
+                    </text>
                   </g>
                 );
               })}
@@ -452,7 +493,7 @@ export function MenuPrincipal() {
           </div>
         )}
 
-        {/* Menu Responsivo Mobile com 5 Colunas */}
+        {/* Menu Responsivo Mobile */}
         <nav className="hidden grid-cols-6 gap-0 border-b border-[#e8edf2] bg-white px-2 pt-[7px] max-[700px]:grid" aria-label="Seções principais">
           {sections.map(({ path, label, icon: Icon }) => (
             <NavLink key={path} to={path} end className={({ isActive }) => `flex min-h-[51px] min-w-0 flex-col items-center justify-center gap-[3px] border-b-2 px-px py-[3px] text-center text-[9px] font-semibold no-underline ${isActive ? 'border-[#15966a] text-[#092b5a]' : 'border-transparent text-[#6e7d90]'}`}>
@@ -470,6 +511,9 @@ export function MenuPrincipal() {
 export function Dashboard() {
   const [metricas, setMetricas] = useState(null);
   const [inadimplentes, setInadimplentes] = useState([]);
+  const [contratos, setContratos] = useState([]);
+  const [imoveis, setImoveis] = useState([]);
+  const [mesSelecionado, setMesSelecionado] = useState('TODOS');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [tentativa, setTentativa] = useState(0);
@@ -480,14 +524,29 @@ export function Dashboard() {
     month: 'long',
   }).format(new Date());
 
+  const extrairLista = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (payload && Array.isArray(payload.content)) return payload.content;
+    return [];
+  };
+
   useEffect(() => {
     async function carregarDashboard() {
       try {
         setIsLoading(true);
         setLoadError('');
-        const { data } = await api.get('/dashboard');
+
+        const [resDash, resContratos, resImoveis] = await Promise.all([
+          api.get('/dashboard'),
+          api.get('/contratos').catch(() => ({ data: [] })),
+          api.get('/imoveis').catch(() => ({ data: [] })),
+        ]);
+
+        const data = resDash.data;
         setMetricas(data);
-        setInadimplentes(data.inadimplentes ?? []);
+        setInadimplentes(extrairLista(data?.inadimplentes));
+        setContratos(extrairLista(resContratos?.data));
+        setImoveis(extrairLista(resImoveis?.data));
       } catch (error) {
         console.error("Erro ao carregar dados do dashboard:", error);
         setLoadError('Não foi possível carregar o painel financeiro. Verifique sua conexão e tente novamente.');
@@ -501,6 +560,166 @@ export function Dashboard() {
 
   const formatarMoeda = (valor) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+
+  const formatarCompetencia = (mesAno) => {
+    if (!mesAno || mesAno === 'TODOS') return 'Todos os períodos';
+    const data = new Date(`${mesAno}-01T12:00:00`);
+    if (Number.isNaN(data.getTime())) return mesAno;
+    return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(data);
+  };
+
+  const formatarDataBr = (valorData) => {
+    if (!valorData) return '';
+    if (Array.isArray(valorData) && valorData.length >= 3) {
+      const [ano, mes, dia] = valorData;
+      return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${ano}`;
+    }
+    const str = String(valorData).trim();
+    const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+    }
+    const ymMatch = str.match(/^(\d{4})-(\d{2})$/);
+    if (ymMatch) {
+      return `${ymMatch[2]}/${ymMatch[1]}`;
+    }
+    return str;
+  };
+
+  const encontrarContratoRelacionado = (item) => {
+    const contratoId =
+      item.contratoId ??
+      item.idContrato ??
+      item.contrato?.idContrato ??
+      item.contrato?.id;
+
+    if (contratoId != null) {
+      const porId = contratos.find(
+        (c) => Number(c.idContrato ?? c.id) === Number(contratoId)
+      );
+      if (porId) return porId;
+    }
+
+    const imovelId =
+      item.imovelId ??
+      item.idImovel ??
+      item.imovel?.idImovel ??
+      item.imovel?.id;
+
+    if (imovelId != null) {
+      const porImovel = contratos.find(
+        (c) => Number(c.imovelId ?? c.imovel?.idImovel ?? c.imovel?.id) === Number(imovelId)
+      );
+      if (porImovel) return porImovel;
+    }
+
+    // Fallback: cruza pelo nome do inquilino e valor da parcela
+    const nomeItem = (item.locatarioNome || item.nomeInquilino || item.inquilino || '').trim().toLowerCase();
+    const valorItem = Number(item.valor ?? item.valorCobrado ?? item.valorPendente ?? 0);
+
+    if (nomeItem) {
+      const candidatos = contratos.filter((c) => {
+        const nomeContrato = (c.locatarioNome || c.locatario?.nomeCompleto || '').trim().toLowerCase();
+        return nomeContrato === nomeItem;
+      });
+      if (candidatos.length === 1) return candidatos[0];
+      if (candidatos.length > 1 && valorItem > 0) {
+        const porValor = candidatos.find((c) => Number(c.valorAcordado) === valorItem);
+        if (porValor) return porValor;
+      }
+    }
+
+    return null;
+  };
+
+  const resolverImovelTexto = (item, contratoRelacionado) => {
+    const direto =
+      item.imovelEndereco ||
+      item.enderecoImovel ||
+      item.endereco ||
+      (typeof item.imovel === 'string' ? item.imovel : item.imovel?.endereco) ||
+      item.contrato?.imovelEndereco ||
+      item.contrato?.imovel?.endereco;
+
+    if (direto) return direto;
+
+    const imovelId =
+      item.imovelId ??
+      item.idImovel ??
+      item.imovel?.idImovel ??
+      item.imovel?.id ??
+      contratoRelacionado?.imovelId ??
+      contratoRelacionado?.imovel?.idImovel ??
+      contratoRelacionado?.imovel?.id;
+
+    if (imovelId != null) {
+      const imovelObj = imoveis.find(
+        (im) => Number(im.idImovel ?? im.id ?? im.imovelId) === Number(imovelId)
+      );
+      const endImovel =
+        imovelObj?.endereco ||
+        imovelObj?.enderecoCompleto ||
+        contratoRelacionado?.imovelEndereco ||
+        contratoRelacionado?.imovel?.endereco;
+
+      if (endImovel) return endImovel;
+      return `Imóvel #${imovelId}`;
+    }
+
+    return 'Não informado';
+  };
+
+  const resolverVencimento = (item, contratoRelacionado) => {
+    const dataBruta =
+      item.dataVencimento ??
+      item.vencimento ??
+      item.dataPrevista ??
+      item.dataCobranca ??
+      item.dataPagamento ??
+      item.dtVencimento ??
+      item.data ??
+      item.cobranca?.dataVencimento;
+
+    if (dataBruta) {
+      const formatada = formatarDataBr(dataBruta);
+      let competencia = '';
+      if (Array.isArray(dataBruta) && dataBruta.length >= 2) {
+        competencia = `${dataBruta[0]}-${String(dataBruta[1]).padStart(2, '0')}`;
+      } else {
+        const m = String(dataBruta).match(/^(\d{4})-(\d{2})/);
+        if (m) competencia = `${m[1]}-${m[2]}`;
+      }
+      return { texto: formatada, competencia };
+    }
+
+    const refMes = item.mesReferencia || item.competencia || item.referencia || '';
+    const refStr = String(refMes).trim();
+    const ymMatch = refStr.match(/^(\d{4})-(\d{2})/);
+    const myMatch = refStr.match(/^(\d{2})\/(\d{4})/);
+
+    const diaVenc =
+      item.diaVencimento ??
+      contratoRelacionado?.diaVencimento ??
+      contratoRelacionado?.diaPagamento;
+
+    if (ymMatch) {
+      const competencia = `${ymMatch[1]}-${ymMatch[2]}`;
+      const texto = diaVenc
+        ? `${String(diaVenc).padStart(2, '0')}/${ymMatch[2]}/${ymMatch[1]}`
+        : `${ymMatch[2]}/${ymMatch[1]}`;
+      return { texto, competencia };
+    }
+
+    if (myMatch) {
+      const competencia = `${myMatch[2]}-${myMatch[1]}`;
+      const texto = diaVenc
+        ? `${String(diaVenc).padStart(2, '0')}/${myMatch[1]}/${myMatch[2]}`
+        : `${myMatch[1]}/${myMatch[2]}`;
+      return { texto, competencia };
+    }
+
+    return { texto: 'N/I', competencia: '' };
+  };
 
   if (isLoading) {
     return (
@@ -523,16 +742,75 @@ export function Dashboard() {
     );
   }
 
+  const fluxoLista = Array.isArray(metricas.fluxoCaixa) ? metricas.fluxoCaixa : [];
+
+  const inadimplentesEnriquecidos = inadimplentes.map((item) => {
+    const contratoRelacionado = encontrarContratoRelacionado(item);
+    const imovelTexto = resolverImovelTexto(item, contratoRelacionado);
+    const { texto: vencimentoTexto, competencia } = resolverVencimento(item, contratoRelacionado);
+
+    return {
+      ...item,
+      _imovelTexto: imovelTexto,
+      _vencimentoTexto: vencimentoTexto,
+      _competencia: competencia,
+    };
+  });
+
+  const mesesSet = new Set([
+    ...fluxoLista.map((item) => item.mes).filter(Boolean),
+    ...inadimplentesEnriquecidos.map((item) => item._competencia).filter(Boolean),
+  ]);
+  const opcoesMeses = Array.from(mesesSet).sort().reverse();
+
+  const dadosMesAtivo = mesSelecionado !== 'TODOS'
+    ? fluxoLista.find((item) => item.mes === mesSelecionado)
+    : null;
+
+  const valorRecebidoExibido = dadosMesAtivo ? dadosMesAtivo.recebido : metricas.recebidoMes;
+  const valorReformasExibido = dadosMesAtivo ? dadosMesAtivo.gastosReformas : metricas.gastosReformas;
+  const valorInadimplenciaExibido = dadosMesAtivo
+    ? (dadosMesAtivo.inadimplencia ?? 0)
+    : metricas.totalPendente;
+
+  const inadimplentesFiltrados = mesSelecionado === 'TODOS'
+    ? inadimplentesEnriquecidos
+    : inadimplentesEnriquecidos.filter((item) => item._competencia === mesSelecionado);
+
+  const alternarMesNoGrafico = (mes) => {
+    setMesSelecionado((atual) => (atual === mes ? 'TODOS' : mes));
+  };
+
   return (
     <div className="dashboard-page">
       {/* Cabeçalho */}
-      <div className="mb-[25px] flex items-end justify-between gap-5 max-[700px]:mb-[19px] max-[700px]:flex-col max-[700px]:items-start max-[700px]:gap-2">
+      <div className="mb-[25px] flex items-end justify-between gap-5 max-[700px]:mb-[19px] max-[700px]:flex-col max-[700px]:items-start max-[700px]:gap-3">
         <div>
           <p className="mb-2 text-[10px] font-extrabold tracking-[.1em] text-[#15966a]">SEU ESPAÇO DE GESTÃO</p>
           <h1 className="m-0 text-[29px] leading-[1.2] font-extrabold text-[#092b5a] max-[700px]:text-[25px]">Visão geral</h1>
           <p className="mt-2 text-[13px] text-[#748196] max-[700px]:text-xs max-[700px]:leading-[1.5]">Tudo sobre seus imóveis, contratos e recebimentos.</p>
         </div>
-        <time className="pb-[3px] text-xs text-[#7b8797] capitalize max-[700px]:text-[11px]" dateTime={new Date().toISOString().slice(0, 10)}>{today}</time>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-[#dce3eb] bg-white px-3 py-1.5 shadow-sm">
+            <Calendar className="size-4 text-[#15966a]" aria-hidden="true" />
+            <label htmlFor="filtro-mes-dashboard" className="sr-only">Filtrar por mês</label>
+            <select
+              id="filtro-mes-dashboard"
+              value={mesSelecionado}
+              onChange={(e) => setMesSelecionado(e.target.value)}
+              className="cursor-pointer bg-transparent text-xs font-semibold text-[#092b5a] capitalize outline-none"
+            >
+              <option value="TODOS">Visão Geral (Todos os meses)</option>
+              {opcoesMeses.map((mes) => (
+                <option key={mes} value={mes}>
+                  {formatarCompetencia(mes)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <time className="pb-[3px] text-xs text-[#7b8797] capitalize max-[700px]:text-[11px]" dateTime={new Date().toISOString().slice(0, 10)}>{today}</time>
+        </div>
       </div>
 
       {/* Banner de Boas-Vindas */}
@@ -554,9 +832,14 @@ export function Dashboard() {
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center gap-3 mb-3">
             <span className="grid size-8 place-items-center rounded-md bg-[#eaf6f0] text-[#15966a]"><TrendingUp className="size-4" /></span>
-            <span className="text-xs font-semibold text-[#748196]">Total Recebido (Mês)</span>
+            <span className="text-xs font-semibold text-[#748196]">
+              {mesSelecionado === 'TODOS' ? 'Total Recebido (Mês)' : 'Recebido no Período'}
+            </span>
           </div>
-          <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(metricas.recebidoMes)}</strong>
+          <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(valorRecebidoExibido)}</strong>
+          {mesSelecionado !== 'TODOS' && (
+            <p className="mt-1 text-[11px] capitalize text-[#8995a5]">{formatarCompetencia(mesSelecionado)}</p>
+          )}
         </div>
 
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
@@ -564,20 +847,31 @@ export function Dashboard() {
             <span className="grid size-8 place-items-center rounded-md bg-[#fff4e5] text-[#f2994a]"><Wrench className="size-4" /></span>
             <span className="text-xs font-semibold text-[#748196]">Gastos em Reformas</span>
           </div>
-          {metricas.gastosReformas == null ? (
+          {valorReformasExibido == null ? (
             <span className="text-lg font-bold text-[#748196]">Sem dados</span>
           ) : (
-            <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(metricas.gastosReformas)}</strong>
+            <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(valorReformasExibido)}</strong>
           )}
-          <p className="mt-1 text-[11px] text-[#8995a5]">Total informado nas manutenções</p>
+          <p className="mt-1 text-[11px] text-[#8995a5]">
+            {mesSelecionado === 'TODOS' ? 'Total informado nas manutenções' : `Manutenções em ${formatarCompetencia(mesSelecionado)}`}
+          </p>
         </div>
 
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="grid size-8 place-items-center rounded-md bg-[#feeeee] text-[#eb5757]"><AlertCircle className="size-4" /></span>
-            <span className="text-xs font-semibold text-[#748196]">Total Pendente</span>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-3">
+              <span className="grid size-8 place-items-center rounded-md bg-[#feeeee] text-[#eb5757]"><AlertCircle className="size-4" /></span>
+              <span className="text-xs font-semibold text-[#748196]">
+                {mesSelecionado === 'TODOS' ? 'Total Pendente' : 'Inadimplência do Mês'}
+              </span>
+            </div>
           </div>
-          <strong className="text-2xl font-bold text-[#eb5757]">{formatarMoeda(metricas.totalPendente)}</strong>
+          <strong className="text-2xl font-bold text-[#eb5757]">{formatarMoeda(valorInadimplenciaExibido)}</strong>
+          {mesSelecionado !== 'TODOS' && (
+            <p className="mt-1 text-[11px] text-[#8995a5]">
+              Pendente geral: {formatarMoeda(metricas.totalPendente)}
+            </p>
+          )}
         </div>
 
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
@@ -594,61 +888,109 @@ export function Dashboard() {
         </div>
       </section>
 
-      <GraficoFluxoCaixa dados={metricas.fluxoCaixa} formatarMoeda={formatarMoeda} />
+      <GraficoFluxoCaixa
+        dados={metricas.fluxoCaixa}
+        formatarMoeda={formatarMoeda}
+        mesSelecionado={mesSelecionado}
+        onSelecionarMes={alternarMesNoGrafico}
+      />
 
-      {/* Tabela de Controle/Alertas */}
+      {/* Tabela de Controle/Alertas de Inadimplência */}
       <section className="rounded-lg border border-[#e8edf2] bg-white overflow-hidden shadow-sm mb-8">
-        <div className="flex items-center gap-2 border-b border-[#e8edf2] bg-[#fcfcfd] px-5 py-4">
-          <AlertTriangle className="size-4 text-[#eb5757]" />
-          <h2 className="text-[14px] font-bold text-[#092b5a]">Atenção: Pagamentos em atraso</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e8edf2] bg-[#fcfcfd] px-5 py-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-[#eb5757]" aria-hidden="true" />
+            <h2 className="m-0 text-sm font-bold text-[#092b5a]">
+              Controle de Inadimplência e Pendências
+            </h2>
+            {mesSelecionado !== 'TODOS' && (
+              <span className="rounded-full bg-[#feeeee] px-2.5 py-0.5 text-[11px] font-bold capitalize text-[#eb5757]">
+                {formatarCompetencia(mesSelecionado)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Filtrar inadimplência por mês"
+              value={mesSelecionado}
+              onChange={(e) => setMesSelecionado(e.target.value)}
+              className="cursor-pointer rounded-md border border-[#dce3eb] bg-white px-2.5 py-1 text-xs font-semibold text-[#092b5a] capitalize outline-none focus:border-[#15966a]"
+            >
+              <option value="TODOS">Todos os meses</option>
+              {opcoesMeses.map((mes) => (
+                <option key={mes} value={mes}>
+                  {formatarCompetencia(mes)}
+                </option>
+              ))}
+            </select>
+
+            <Link
+              to="/financeiro"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#15966a] no-underline hover:underline"
+            >
+              Ver financeiro <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
         </div>
 
-        {inadimplentes.length > 0 ? (
+        {inadimplentesFiltrados.length === 0 ? (
+          <div className="px-5 py-8 text-center">
+            <p className="m-0 text-xs text-[#748196]">
+              {mesSelecionado === 'TODOS'
+                ? 'Nenhuma pendência ou inadimplência registrada no momento.'
+                : `Nenhuma inadimplência registrada em ${formatarCompetencia(mesSelecionado)}.`}
+            </p>
+            {mesSelecionado !== 'TODOS' && (
+              <button
+                type="button"
+                onClick={() => setMesSelecionado('TODOS')}
+                className="mt-2 cursor-pointer border-0 bg-transparent text-xs font-semibold text-[#15966a] hover:underline"
+              >
+                Exibir todos os períodos
+              </button>
+            )}
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="bg-[#f9fafb] text-[#748196]">
+            <table className="w-full text-left text-sm text-[#46566b]">
+              <thead className="bg-[#f6f8fa] text-xs uppercase text-[#092b5a]">
                 <tr>
-                  <th className="px-5 py-3 font-semibold">Inquilino</th>
-                  <th className="px-5 py-3 font-semibold">Imóvel</th>
-                  <th className="px-5 py-3 font-semibold">Atraso</th>
-                  <th className="px-5 py-3 font-semibold">Valor Pendente</th>
+                  <th className="px-5 py-3">Inquilino</th>
+                  <th className="px-4 py-3">Imóvel</th>
+                  <th className="px-4 py-3">Vencimento</th>
+                  <th className="px-4 py-3">Valor</th>
+                  <th className="px-4 py-3 text-right">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e8edf2]">
-                {inadimplentes.map((item) => (
-                  <tr key={item.id} className="hover:bg-[#f6f8fa] transition-colors">
-                    <td className="px-5 py-3 font-medium text-[#092b5a]">{item.inquilino}</td>
-                    <td className="px-5 py-3 text-[#46566b]">{item.imovel}</td>
-                    <td className="px-5 py-3 text-[#eb5757] font-semibold">{item.diasAtraso} dias</td>
-                    <td className="px-5 py-3 font-medium text-[#092b5a]">{formatarMoeda(item.valor)}</td>
+                {inadimplentesFiltrados.map((item, idx) => (
+                  <tr key={item.idCobranca || item.id || idx} className="hover:bg-[#fcfdfd]">
+                    <td className="px-5 py-3 font-semibold text-[#092b5a]">
+                      {item.locatarioNome || item.nomeInquilino || item.inquilino || 'Inquilino'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-[#748196]">
+                      {item._imovelTexto}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {item._vencimentoTexto}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-[#eb5757]">
+                      {formatarMoeda(item.valor || item.valorCobrado || item.valorPendente)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-600">
+                        {item.diasAtraso != null
+                          ? `${item.diasAtraso} ${item.diasAtraso === 1 ? 'dia' : 'dias'} em atraso`
+                          : (item.status || 'Em atraso')}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          <div className="px-5 py-8 text-center text-[13px] text-[#748196]">
-            Nenhum registro de inadimplência no momento.
-          </div>
         )}
-      </section>
-    </div>
-  );
-}
-
-export function SectionPage({ section }) {
-  const { title, eyebrow, description, icon: Icon, emptyTitle, emptyDescription } = sectionDetails[section];
-
-  return (
-    <div className="section-page">
-      <div className="mb-[26px] max-[700px]:mb-[19px]">
-        <div><p className="mb-2 text-[10px] font-extrabold tracking-[.1em] text-[#15966a]">{eyebrow}</p><h1 className="m-0 text-[29px] leading-[1.2] font-extrabold text-[#092b5a] max-[700px]:text-[25px]">{title}</h1><p className="mt-2 text-[13px] text-[#748196] max-[700px]:text-xs max-[700px]:leading-[1.5]">{description}</p></div>
-      </div>
-      <section className="flex min-h-[310px] flex-col items-center justify-center rounded-[9px] border border-[#e8edf2] bg-white px-5 py-8 text-center max-[700px]:min-h-[275px] max-[700px]:px-[18px] max-[700px]:py-[25px]">
-        <span className="mb-[17px] grid size-[54px] place-items-center rounded-full bg-[#eaf6f0] text-[#15966a]"><Icon className="size-6" aria-hidden="true" /></span>
-        <h2 className="m-0 text-base text-[#092b5a]">{emptyTitle}</h2>
-        <p className="mt-2 mb-[19px] max-w-[400px] text-xs leading-[1.6] text-[#748196]">{emptyDescription}</p>
-        <Link to="/dashboard" className="inline-flex items-center gap-[7px] text-xs font-bold text-[#15966a] no-underline hover:underline"><ArrowRight className="size-[15px] rotate-180" aria-hidden="true" /> Voltar ao dashboard</Link>
       </section>
     </div>
   );
