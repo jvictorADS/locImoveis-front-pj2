@@ -106,19 +106,6 @@ export function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-slate-300 text-[#092b5a] focus:ring-[#092b5a]"
-                />
-                <span className="text-slate-500 font-medium">Lembrar de mim</span>
-              </label>
-              <a href="#" className="font-bold text-[#092b5a] hover:underline">
-                Esqueceu a senha?
-              </a>
-            </div>
-
             {/* Botão Entrar */}
             <button
               type="submit"
@@ -145,17 +132,6 @@ export function Login() {
             <Link to="/cadastro" className="font-bold text-emerald-600 hover:underline">
               Criar conta de Proprietário
             </Link>
-          </div>
-
-          {/* Portal do Inquilino */}
-          <div className="mt-8 bg-[#f8fafc] border border-slate-100 rounded-2xl p-5 text-center space-y-3">
-            <p className="text-sm font-medium text-slate-500">
-              É um inquilino e deseja acessar seus boletos?
-            </p>
-            <button className="w-full flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-[#092b5a] font-bold rounded-xl transition duration-200 shadow-sm">
-              <Key className="w-4 h-4" />
-              Acessar Portal do Inquilino
-            </button>
           </div>
 
         </div>
