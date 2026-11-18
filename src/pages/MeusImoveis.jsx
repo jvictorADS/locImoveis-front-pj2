@@ -269,7 +269,7 @@ export function Imoveis() {
           </p>
         </section>
       ) : (
-        <section className="grid grid-cols-3 gap-5 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
+        <section className="max-h-[70vh] grid grid-cols-3 gap-5 overflow-y-auto pr-2 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
           {imoveis.map((imovel) => (
             <div key={imovel.idImovel} className="flex flex-col overflow-hidden rounded-[9px] border border-[#e8edf2] bg-white shadow-sm transition-shadow hover:shadow-md relative">
 

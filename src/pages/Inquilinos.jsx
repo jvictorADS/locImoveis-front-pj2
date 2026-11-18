@@ -58,7 +58,7 @@ export function Inquilinos() {
             const [resInquilinos, resContratos, resImoveis] = await Promise.all([
                 fetch('http://localhost:8081/usuarios/tipo/LOCATARIO', { headers }),
                 fetch('http://localhost:8081/contratos', { headers }),
-                fetch('http://localhost:8081/imoveis', { headers }).catch(() => ({ ok: false }))
+                fetch('http://localhost:8081/imoveis/me', { headers })
             ]);
 
             if (resInquilinos.ok) {
@@ -383,7 +383,7 @@ export function Inquilinos() {
                     <p className="mt-1 text-xs text-[#748196]">Cadastre um novo locatário ou ajuste o filtro de busca.</p>
                 </section>
             ) : (
-                <div className="overflow-x-auto rounded-[9px] border border-[#e8edf2] bg-white shadow-sm">
+                <div className="max-h-[70vh] overflow-x-auto overflow-y-auto rounded-[9px] border border-[#e8edf2] bg-white shadow-sm">
                     <table className="w-full text-left text-sm text-[#46566b]">
                         <thead className="bg-[#f6f8fa] text-xs uppercase text-[#092b5a]">
                             <tr>
