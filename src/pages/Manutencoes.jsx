@@ -189,14 +189,14 @@ export function Manutencoes() {
             <Wrench className="size-6" aria-hidden="true" />
           </span>
           <h2 className="m-0 text-base font-bold text-[#092b5a]">
-            {filtro ? 'Nenhuma manutenção encontrada' : 'Nenhum pedido de manutenção'}
+            {filtro ? 'Nenhuma manutenção encontrada' : 'Nenhum Pedido de Manutenção'}
           </h2>
           <p className="mt-1 text-xs text-[#748196]">
             {filtro ? 'Ajuste os termos da busca.' : 'Os pedidos registrados para seus contratos aparecerão aqui.'}
           </p>
         </section>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[#e8edf2] bg-white shadow-sm">
+        <div className="max-h-[70vh] overflow-x-auto overflow-y-auto rounded-lg border border-[#e8edf2] bg-white shadow-sm">
           <table className="w-full text-left text-sm text-[#46566b]">
             <thead className="bg-[#f6f8fa] text-xs uppercase text-[#092b5a]">
               <tr>

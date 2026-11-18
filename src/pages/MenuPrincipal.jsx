@@ -12,6 +12,7 @@ import {
   Wrench,
   AlertCircle,
   AlertTriangle,
+  Filter,
   Loader2,
   Users,
   ChevronRight,
@@ -97,7 +98,7 @@ const sectionDetails = {
   },
 };
 
-function GraficoFluxoCaixa({ dados, formatarMoeda }) {
+function GraficoFluxoCaixa({ dados, formatarMoeda, mesSelecionado }) {
   const [periodo, setPeriodo] = useState(6);
   const meses = Array.isArray(dados) ? dados.slice(-periodo) : [];
   const series = [
@@ -131,25 +132,27 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
   const temMovimentacao = valores.some((valor) => valor > 0);
 
   return (
-    <section className="mb-8 rounded-lg border border-[#e8edf2] bg-white p-6 shadow-sm max-[700px]:p-4">
+    <section className="mb-8 min-w-0 max-w-full rounded-lg border border-[#e8edf2] bg-white p-6 shadow-sm max-[700px]:p-4">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-[16px] font-bold text-[#092b5a]">Fluxo de Caixa e Ocorrências</h2>
+          <h2 className="text-[16px] font-bold text-[#092b5a]">Fluxo de Caixa</h2>
           <p className="mt-1 text-[13px] text-[#748196]">Recebimentos, gastos de manutenção e valores em atraso agrupados por mês.</p>
         </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Período do gráfico">
-          {[6, 12].map((quantidade) => (
-            <button
-              key={quantidade}
-              type="button"
-              aria-pressed={periodo === quantidade}
-              onClick={() => setPeriodo(quantidade)}
-              className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${periodo === quantidade ? 'border-[#092b5a] bg-[#092b5a] text-white' : 'border-[#dce3eb] bg-white text-[#46566b] hover:border-[#092b5a]'}`}
-            >
-              {quantidade} meses
-            </button>
-          ))}
-        </div>
+        {!mesSelecionado && (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Período do gráfico">
+            {[6, 12].map((quantidade) => (
+              <button
+                key={quantidade}
+                type="button"
+                aria-pressed={periodo === quantidade}
+                onClick={() => setPeriodo(quantidade)}
+                className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${periodo === quantidade ? 'border-[#092b5a] bg-[#092b5a] text-white' : 'border-[#dce3eb] bg-white text-[#46566b] hover:border-[#092b5a]'}`}
+              >
+                {quantidade} meses
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] font-medium text-[#46566b]" aria-label="Legenda">
@@ -162,7 +165,7 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
       </div>
 
       {Array.isArray(dados) ? (
-        <div className="relative overflow-x-auto">
+        <div className="relative max-w-full overflow-x-auto">
           {meses.length > 0 ? (
             <svg
               className="h-[300px] min-w-[640px] w-full"
@@ -171,7 +174,11 @@ function GraficoFluxoCaixa({ dados, formatarMoeda }) {
               aria-labelledby="grafico-fluxo-titulo"
               aria-describedby="grafico-fluxo-descricao"
             >
-              <title id="grafico-fluxo-titulo">Fluxo de caixa nos últimos {periodo} meses</title>
+              <title id="grafico-fluxo-titulo">
+                {mesSelecionado && meses.length > 0
+                  ? `Fluxo de caixa em ${formatarMes(meses[0])}`
+                  : `Fluxo de caixa nos últimos ${periodo} meses`}
+              </title>
               <desc id="grafico-fluxo-descricao">Gráfico de barras agrupadas. Cada barra pode ser focada para consultar o valor exato.</desc>
               {[0, 1, 2, 3, 4].map((marcador) => {
                 const valor = (limite * marcador) / 4;
@@ -473,6 +480,20 @@ export function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [tentativa, setTentativa] = useState(0);
+  const [locatarios, setLocatarios] = useState([]);
+  const [imoveis, setImoveis] = useState([]);
+  const [isLoadingFiltros, setIsLoadingFiltros] = useState(true);
+  const [filtrosLoadError, setFiltrosLoadError] = useState('');
+  const [filtrosError, setFiltrosError] = useState('');
+  const [filtros, setFiltros] = useState({
+    dataInicio: '',
+    dataFim: '',
+    locatarioId: '',
+    imovelId: '',
+    status: '',
+    mes: '',
+  });
+  const [filtrosAplicados, setFiltrosAplicados] = useState({});
 
   const today = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -481,23 +502,77 @@ export function Dashboard() {
   }).format(new Date());
 
   useEffect(() => {
+    let cancelado = false;
+
+    async function carregarOpcoesFiltro() {
+      try {
+        setIsLoadingFiltros(true);
+        setFiltrosLoadError('');
+        const [locatariosResponse, imoveisResponse] = await Promise.all([
+          api.get('/usuarios/tipo/LOCATARIO'),
+          api.get('/imoveis/me'),
+        ]);
+        if (cancelado) return;
+        setLocatarios(locatariosResponse.data);
+        setImoveis(imoveisResponse.data);
+      } catch (error) {
+        if (!cancelado) {
+          console.error('Erro ao carregar opções de filtro do dashboard:', error);
+          setFiltrosLoadError('Não foi possível carregar as opções de inquilinos e imóveis.');
+        }
+      } finally {
+        if (!cancelado) setIsLoadingFiltros(false);
+      }
+    }
+
+    carregarOpcoesFiltro();
+    return () => { cancelado = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+
     async function carregarDashboard() {
       try {
         setIsLoading(true);
         setLoadError('');
-        const { data } = await api.get('/dashboard');
+        const { data } = await api.get('/dashboard', { params: filtrosAplicados });
+        if (cancelado) return;
         setMetricas(data);
         setInadimplentes(data.inadimplentes ?? []);
       } catch (error) {
-        console.error("Erro ao carregar dados do dashboard:", error);
-        setLoadError('Não foi possível carregar o painel financeiro. Verifique sua conexão e tente novamente.');
+        if (!cancelado) {
+          console.error("Erro ao carregar dados do dashboard:", error);
+          setLoadError(error.response?.status === 400
+            ? 'Os filtros informados são inválidos. Confira as datas e tente novamente.'
+            : 'Não foi possível carregar o painel financeiro. Verifique sua conexão e tente novamente.');
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelado) setIsLoading(false);
       }
     }
 
     carregarDashboard();
-  }, [tentativa]);
+    return () => { cancelado = true; };
+  }, [tentativa, filtrosAplicados]);
+
+  const aplicarFiltros = (event) => {
+    event.preventDefault();
+    if (filtros.dataInicio && filtros.dataFim && filtros.dataInicio > filtros.dataFim) {
+      setFiltrosError('A data inicial não pode ser posterior à data final.');
+      return;
+    }
+    setFiltrosError('');
+    setFiltrosAplicados(Object.fromEntries(
+      Object.entries(filtros).filter(([, valor]) => valor !== ''),
+    ));
+  };
+
+  const limparFiltros = () => {
+    setFiltros({ dataInicio: '', dataFim: '', locatarioId: '', imovelId: '', status: '', mes: '' });
+    setFiltrosAplicados({});
+    setFiltrosError('');
+  };
 
   const formatarMoeda = (valor) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
@@ -524,19 +599,9 @@ export function Dashboard() {
   }
 
   return (
-    <div className="dashboard-page">
-      {/* Cabeçalho */}
-      <div className="mb-[25px] flex items-end justify-between gap-5 max-[700px]:mb-[19px] max-[700px]:flex-col max-[700px]:items-start max-[700px]:gap-2">
-        <div>
-          <p className="mb-2 text-[10px] font-extrabold tracking-[.1em] text-[#15966a]">SEU ESPAÇO DE GESTÃO</p>
-          <h1 className="m-0 text-[29px] leading-[1.2] font-extrabold text-[#092b5a] max-[700px]:text-[25px]">Visão geral</h1>
-          <p className="mt-2 text-[13px] text-[#748196] max-[700px]:text-xs max-[700px]:leading-[1.5]">Tudo sobre seus imóveis, contratos e recebimentos.</p>
-        </div>
-        <time className="pb-[3px] text-xs text-[#7b8797] capitalize max-[700px]:text-[11px]" dateTime={new Date().toISOString().slice(0, 10)}>{today}</time>
-      </div>
-
+    <div className="dashboard-page min-w-0 w-full max-w-full">
       {/* Banner de Boas-Vindas */}
-      <section className="relative flex min-h-[204px] items-center overflow-hidden rounded-[10px] bg-[#092b5a] px-9 py-[30px] text-white mb-8 after:absolute after:-top-[220px] after:right-[115px] after:size-[370px] after:rounded-full after:border after:border-[#ffffff13] after:content-[''] after:shadow-[0_0_0_35px_#ffffff08,0_0_0_70px_#ffffff05] max-[700px]:min-h-[190px] max-[700px]:px-5 max-[700px]:py-6">
+      <section className="relative mb-8 flex min-h-[204px] items-center overflow-hidden rounded-[10px] bg-[#092b5a] px-9 py-[30px] text-white after:absolute after:-top-[220px] after:right-[115px] after:size-[370px] after:rounded-full after:border after:border-[#ffffff13] after:content-[''] after:shadow-[0_0_0_35px_#ffffff08,0_0_0_70px_#ffffff05] max-[700px]:min-h-[190px] max-[700px]:px-5 max-[700px]:py-6">
         <div className="relative z-[1] max-w-[520px] max-[700px]:max-w-[90%]">
           <span className="text-[9px] font-bold tracking-[.12em] text-[#9eafc4] max-[700px]:text-[8px]">LOC IMÓVEIS <span className="px-[5px] text-[#74d8ae]" aria-hidden="true">/</span> PAINEL DO PROPRIETÁRIO</span>
           <h2 className="mt-[18px] mb-2 text-[26px] leading-[1.2] font-bold text-white max-[700px]:mt-[15px] max-[700px]:max-w-[240px] max-[700px]:text-[22px]">Bem-vindo ao seu painel.</h2>
@@ -549,12 +614,190 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* Cartões de Métricas */}
-      <section className="grid grid-cols-4 gap-[15px] mb-8 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
+      {/* Cabeçalho */}
+      <div className="mb-[25px] flex items-end justify-between gap-5 max-[700px]:mb-[19px] max-[700px]:flex-col max-[700px]:items-start max-[700px]:gap-2">
+        <div>
+          <p className="mb-2 text-[10px] font-extrabold tracking-[.1em] text-[#15966a]">SEU ESPAÇO DE GESTÃO</p>
+          <h1 className="m-0 text-[29px] leading-[1.2] font-extrabold text-[#092b5a] max-[700px]:text-[25px]">Visão geral</h1>
+          <p className="mt-2 text-[13px] text-[#748196] max-[700px]:text-xs max-[700px]:leading-[1.5]">Tudo sobre seus imóveis, contratos e recebimentos.</p>
+        </div>
+        <time className="pb-[3px] text-xs text-[#7b8797] capitalize max-[700px]:text-[11px]" dateTime={new Date().toISOString().slice(0, 10)}>{today}</time>
+      </div>
+
+      <nav aria-label="Navegação rápida" className="mb-8 grid grid-cols-4 gap-4 max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
+        <Link
+          to="/inquilinos"
+          className="group flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm no-underline transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg bg-[#eaf6f0] text-[#15966a] transition-colors group-hover:bg-[#15966a] group-hover:text-white">
+              <Users className="size-5" />
+            </span>
+            <div>
+              <strong className="block text-sm font-bold text-[#092b5a]">Inquilinos</strong>
+              <span className="text-xs text-[#748196]">Gerenciar locatários</span>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-[#8995a5] transition-colors group-hover:text-[#15966a]" />
+        </Link>
+
+        <Link
+          to="/imoveis"
+          className="group flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm no-underline transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg bg-[#f0f4f8] text-[#092b5a] transition-colors group-hover:bg-[#092b5a] group-hover:text-white">
+              <Building2 className="size-5" />
+            </span>
+            <div>
+              <strong className="block text-sm font-bold text-[#092b5a]">Meus Imóveis</strong>
+              <span className="text-xs text-[#748196]">Cadastrar e listar</span>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-[#8995a5] transition-colors group-hover:text-[#092b5a]" />
+        </Link>
+
+        <Link
+          to="/contratos"
+          className="group flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm no-underline transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg bg-[#f0f4f8] text-[#092b5a] transition-colors group-hover:bg-[#092b5a] group-hover:text-white">
+              <FileText className="size-5" />
+            </span>
+            <div>
+              <strong className="block text-sm font-bold text-[#092b5a]">Contratos</strong>
+              <span className="text-xs text-[#748196]">Criar e consultar</span>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-[#8995a5] transition-colors group-hover:text-[#092b5a]" />
+        </Link>
+
+        <Link
+          to="/manutencoes"
+          className="group flex items-center justify-between rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm no-underline transition-all hover:-translate-y-0.5 hover:border-[#15966a] hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg bg-[#fff4e5] text-[#f2994a] transition-colors group-hover:bg-[#f2994a] group-hover:text-white">
+              <Wrench className="size-5" />
+            </span>
+            <div>
+              <strong className="block text-sm font-bold text-[#092b5a]">Manutenção</strong>
+              <span className="text-xs text-[#748196]">Controlar pedidos</span>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-[#8995a5] transition-colors group-hover:text-[#15966a]" />
+        </Link>
+      </nav>
+
+      <form onSubmit={aplicarFiltros} className="mb-8 rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <Filter className="size-4 text-[#15966a]" aria-hidden="true" />
+          <h2 className="m-0 text-sm font-bold text-[#092b5a]">Filtrar dados do dashboard</h2>
+        </div>
+        <div className="grid min-w-0 grid-cols-6 gap-3 max-[1050px]:grid-cols-3 max-[900px]:grid-cols-2 max-[700px]:grid-cols-1">
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Data inicial
+            <input
+              type="date"
+              value={filtros.dataInicio}
+              max={filtros.dataFim || undefined}
+              onChange={(event) => setFiltros({ ...filtros, dataInicio: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Data final
+            <input
+              type="date"
+              value={filtros.dataFim}
+              min={filtros.dataInicio || undefined}
+              onChange={(event) => setFiltros({ ...filtros, dataFim: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Inquilino
+            <select
+              value={filtros.locatarioId}
+              onChange={(event) => setFiltros({ ...filtros, locatarioId: event.target.value })}
+              disabled={isLoadingFiltros || Boolean(filtrosLoadError)}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a] disabled:opacity-60"
+            >
+              <option value="">Todos os inquilinos</option>
+              {locatarios.map((locatario) => (
+                <option key={locatario.idUsuario} value={locatario.idUsuario}>{locatario.nomeCompleto}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Imóvel
+            <select
+              value={filtros.imovelId}
+              onChange={(event) => setFiltros({ ...filtros, imovelId: event.target.value })}
+              disabled={isLoadingFiltros || Boolean(filtrosLoadError)}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a] disabled:opacity-60"
+            >
+              <option value="">Todos os imóveis</option>
+              {imoveis.map((imovel) => (
+                <option key={imovel.idImovel} value={imovel.idImovel}>
+                  {imovel.endereco || `Imóvel #${imovel.idImovel}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Status da cobrança
+            <select
+              value={filtros.status}
+              onChange={(event) => setFiltros({ ...filtros, status: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            >
+              <option value="">Todos os status</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="PAGA">Paga</option>
+              <option value="ATRASADA">Atrasada</option>
+              <option value="CANCELADA">Cancelada</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[#46566b]">
+            Mês da inadimplência
+            <input
+              type="month"
+              value={filtros.mes}
+              onChange={(event) => setFiltros({ ...filtros, mes: event.target.value })}
+              className="min-w-0 rounded-md border border-[#dce3eb] bg-white px-3 py-2 text-sm font-normal text-[#092b5a] outline-none focus:border-[#15966a]"
+            />
+          </label>
+        </div>
+        {filtrosLoadError && <p className="mt-3 mb-0 text-xs text-[#eb5757]" role="alert">{filtrosLoadError}</p>}
+        {filtrosError && <p className="mt-3 mb-0 text-xs text-[#eb5757]" role="alert">{filtrosError}</p>}
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={limparFiltros}
+            className="cursor-pointer rounded-md border border-[#dce3eb] bg-white px-4 py-2 text-xs font-semibold text-[#46566b] hover:bg-[#f6f8fa]"
+          >
+            Limpar filtros
+          </button>
+          <button
+            type="submit"
+            className="cursor-pointer rounded-md border-0 bg-[#15966a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#117a56]"
+          >
+            Aplicar filtros
+          </button>
+        </div>
+      </form>
+
+      <section aria-label="Indicadores financeiros e status dos imóveis" className="mb-8 grid grid-cols-4 gap-[15px] max-[1050px]:grid-cols-2 max-[700px]:grid-cols-1">
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center gap-3 mb-3">
             <span className="grid size-8 place-items-center rounded-md bg-[#eaf6f0] text-[#15966a]"><TrendingUp className="size-4" /></span>
-            <span className="text-xs font-semibold text-[#748196]">Total Recebido (Mês)</span>
+            <span className="text-xs font-semibold text-[#748196]">
+              {filtrosAplicados.dataInicio || filtrosAplicados.dataFim
+                ? 'Total Recebido no Período'
+                : 'Total Recebido (Mês)'}
+            </span>
           </div>
           <strong className="text-2xl font-bold text-[#092b5a]">{formatarMoeda(metricas.recebidoMes)}</strong>
         </div>
@@ -562,7 +805,7 @@ export function Dashboard() {
         <div className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm hover:-translate-y-0.5 transition-transform">
           <div className="flex items-center gap-3 mb-3">
             <span className="grid size-8 place-items-center rounded-md bg-[#fff4e5] text-[#f2994a]"><Wrench className="size-4" /></span>
-            <span className="text-xs font-semibold text-[#748196]">Gastos em Reformas</span>
+            <span className="text-xs font-semibold text-[#748196]">Gasto com Reformas</span>
           </div>
           {metricas.gastosReformas == null ? (
             <span className="text-lg font-bold text-[#748196]">Sem dados</span>
@@ -587,14 +830,14 @@ export function Dashboard() {
           </div>
           <div className="flex items-end gap-2">
             <strong className="text-2xl font-bold text-[#092b5a]">{metricas.imoveisAlugados}</strong>
-            <span className="text-xs text-[#748196] mb-1">alugados /</span>
+            <span className="mb-1 text-xs text-[#748196]">alugados /</span>
             <strong className="text-xl font-bold text-[#8995a5]">{metricas.imoveisVagos}</strong>
-            <span className="text-xs text-[#748196] mb-1">vagos</span>
+            <span className="mb-1 text-xs text-[#748196]">vagos</span>
           </div>
         </div>
       </section>
 
-      <GraficoFluxoCaixa dados={metricas.fluxoCaixa} formatarMoeda={formatarMoeda} />
+      <GraficoFluxoCaixa dados={metricas.fluxoCaixa} formatarMoeda={formatarMoeda} mesSelecionado={filtrosAplicados.mes} />
 
       {/* Tabela de Controle/Alertas */}
       <section className="rounded-lg border border-[#e8edf2] bg-white overflow-hidden shadow-sm mb-8">
@@ -604,7 +847,7 @@ export function Dashboard() {
         </div>
 
         {inadimplentes.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="max-h-[220px] overflow-x-auto overflow-y-auto">
             <table className="w-full text-left text-[13px]">
               <thead className="bg-[#f9fafb] text-[#748196]">
                 <tr>

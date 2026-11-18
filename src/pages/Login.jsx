@@ -63,10 +63,10 @@ export function Login() {
 
           {/* Formulário */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Input E-mail / CPF */}
+            {/* Input E-mail */}
             <div>
               <label className="block text-sm font-bold text-[#092b5a] mb-1.5">
-                E-mail ou CPF
+                E-mail
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />

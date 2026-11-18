@@ -223,9 +223,9 @@ export function Financeiro() {
         <CartaoResumo titulo="Aluguéis em atraso" valor={formatarMoeda(totalAtraso)} detalhe={`${financeiro.emAtraso.length} cobrança(s) vencida(s)`} icon={CircleAlert} tone="red" />
       </section>
 
-      <section className="mb-7 grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_.85fr]">
-        <article className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-start justify-between gap-3">
+      <section className="mb-7 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3" aria-label="Próximos recebimentos e despesas">
+        <article className="h-full rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="m-0 text-[15px] font-bold text-[#092b5a]">Próximo aluguel a receber</h2>
               <p className="mt-1 mb-0 text-xs text-[#748196]">Cobrança futura registrada nos seus contratos.</p>
@@ -235,10 +235,10 @@ export function Financeiro() {
             </span>
           </div>
           {proximoRecebimento ? (
-            <div className="flex flex-wrap items-end justify-between gap-4 rounded-lg bg-[#f7faf8] p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg bg-[#f7faf8] p-3">
               <div>
                 <p className="mb-1 text-[11px] font-semibold text-[#748196]">{formatarData(proximoRecebimento.dataVencimento)} · {proximoRecebimento.inquilino}</p>
-                <strong className="text-[25px] font-bold text-[#092b5a]">{formatarMoeda(proximoRecebimento.valor)}</strong>
+                <strong className="text-[22px] font-bold text-[#092b5a]">{formatarMoeda(proximoRecebimento.valor)}</strong>
                 <p className="mt-1 mb-0 text-xs text-[#748196]">{proximoRecebimento.imovel}</p>
               </div>
             </div>
@@ -247,16 +247,46 @@ export function Financeiro() {
           )}
         </article>
 
-        <article className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+        <article className="h-full rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="m-0 text-[15px] font-bold text-[#092b5a]">A receber neste mês</h2>
               <p className="mt-1 mb-0 text-xs text-[#748196]">Cobranças futuras já registradas</p>
             </div>
             <Wallet className="size-5 text-[#15966a]" aria-hidden="true" />
           </div>
-          <strong className="text-[22px] font-bold text-[#092b5a]">{formatarMoeda(somar(financeiro.previstoNoMes, (item) => item.valor))}</strong>
+          <strong className="text-[20px] font-bold text-[#092b5a]">{formatarMoeda(somar(financeiro.previstoNoMes, (item) => item.valor))}</strong>
           <p className="mt-1 mb-0 text-[11px] text-[#8995a5]">{financeiro.previstoNoMes.length} cobrança(s) com vencimento neste mês</p>
+        </article>
+
+        <article className="h-full rounded-lg border border-[#e8edf2] bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="m-0 text-sm font-bold text-[#092b5a]">Despesas registradas</h2>
+              <p className="mt-1 mb-0 text-[11px] text-[#748196]">Manutenções com valor informado.</p>
+            </div>
+            <Link to="/manutencoes" aria-label="Ver manutenções" className="text-[#15966a] hover:text-[#117a56]">
+              <ChevronRight className="size-5" aria-hidden="true" />
+            </Link>
+          </div>
+          {financeiro.manutencoesRecentes.length === 0 ? (
+            <EstadoVazio>Nenhuma despesa com valor registrada.</EstadoVazio>
+          ) : (
+            <ul className="m-0 max-h-[160px] divide-y divide-[#eef1f4] overflow-y-auto p-0">
+              {financeiro.manutencoesRecentes.slice(0, 5).map((item) => (
+                <li key={item.idPedido} className="flex items-center justify-between gap-2 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#fff4e5] text-[#d88735]"><Wrench className="size-4" aria-hidden="true" /></span>
+                    <div className="min-w-0">
+                      <strong className="block truncate text-xs text-[#092b5a]">{item.descricaoProblema}</strong>
+                      <span className="mt-1 block truncate text-[10px] text-[#748196]">{item.imovelEndereco} · {formatarData(item.dataAbertura)}</span>
+                    </div>
+                  </div>
+                  <strong className="shrink-0 text-xs text-[#092b5a]">{formatarMoeda(item.valorGasto)}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
       </section>
 
@@ -273,7 +303,7 @@ export function Financeiro() {
         {financeiro.aReceber.length === 0 ? (
           <EstadoVazio>Nenhum recebimento futuro registrado.</EstadoVazio>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[220px] overflow-x-auto overflow-y-auto">
             <table className="w-full min-w-[560px] text-left text-xs">
               <thead className="text-[10px] font-bold tracking-wide text-[#8995a5] uppercase">
                 <tr className="border-b border-[#e8edf2]">
@@ -302,66 +332,9 @@ export function Financeiro() {
         )}
       </section>
 
-      <section className="mb-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <article className="overflow-hidden rounded-lg border border-[#f2d8d8] bg-white shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-[#f2d8d8] bg-[#fffafa] px-5 py-4">
-            <div className="flex items-center gap-2">
-              <CircleAlert className="size-4 text-[#eb5757]" aria-hidden="true" />
-              <h2 className="m-0 text-sm font-bold text-[#092b5a]">Cobranças em atraso</h2>
-            </div>
-            <span className="rounded-full bg-[#feeeee] px-2.5 py-1 text-[10px] font-bold text-[#c54141]">{financeiro.emAtraso.length} pendente(s)</span>
-          </div>
-          {financeiro.emAtraso.length === 0 ? (
-            <EstadoVazio>Nenhuma cobrança vencida registrada.</EstadoVazio>
-          ) : (
-            <ul className="m-0 divide-y divide-[#eef1f4] p-0">
-              {financeiro.emAtraso.map((item) => (
-                <li key={item.idCobranca} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                  <div>
-                    <strong className="block text-xs text-[#092b5a]">{item.inquilino}</strong>
-                    <span className="mt-1 block text-[11px] text-[#748196]">{item.imovel} · venceu {formatarData(item.dataVencimento)}</span>
-                  </div>
-                  <strong className="block text-xs text-[#eb5757]">{formatarMoeda(item.valor)}</strong>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-
-        <article className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="m-0 text-sm font-bold text-[#092b5a]">Despesas registradas</h2>
-              <p className="mt-1 mb-0 text-[11px] text-[#748196]">Manutenções com valor informado.</p>
-            </div>
-            <Link to="/manutencoes" aria-label="Ver manutenções" className="text-[#15966a] hover:text-[#117a56]">
-              <ChevronRight className="size-5" aria-hidden="true" />
-            </Link>
-          </div>
-          {financeiro.manutencoesRecentes.length === 0 ? (
-            <EstadoVazio>Nenhuma despesa com valor registrada.</EstadoVazio>
-          ) : (
-            <ul className="m-0 divide-y divide-[#eef1f4] p-0">
-              {financeiro.manutencoesRecentes.slice(0, 5).map((item) => (
-                <li key={item.idPedido} className="flex items-center justify-between gap-3 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#fff4e5] text-[#d88735]"><Wrench className="size-4" aria-hidden="true" /></span>
-                    <div className="min-w-0">
-                      <strong className="block truncate text-xs text-[#092b5a]">{item.descricaoProblema}</strong>
-                      <span className="mt-1 block truncate text-[10px] text-[#748196]">{item.imovelEndereco} · {formatarData(item.dataAbertura)}</span>
-                    </div>
-                  </div>
-                  <strong className="shrink-0 text-xs text-[#092b5a]">{formatarMoeda(item.valorGasto)}</strong>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-      </section>
-
-      <section className="rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
+      <section className="mb-7 rounded-lg border border-[#e8edf2] bg-white p-5 shadow-sm">
         <div className="mb-5">
-          <h2 className="m-0 text-[15px] font-bold text-[#092b5a]">Resumo de recebimentos e despesas</h2>
+          <h2 className="m-0 text-[15px] font-bold text-[#092b5a]">Resumo de compras e despesas</h2>
           <p className="mt-1 mb-0 text-xs text-[#748196]">Movimentações reais dos últimos seis meses.</p>
         </div>
         <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-[11px] font-medium text-[#46566b]">
@@ -394,6 +367,34 @@ export function Financeiro() {
           </div>
         )}
         <p className="mt-4 mb-0 flex items-center gap-2 text-[10px] text-[#8995a5]"><CreditCard className="size-3.5" aria-hidden="true" />Recebimentos vêm de cobranças marcadas como pagas; despesas vêm dos valores informados nas manutenções.</p>
+      </section>
+
+      <section className="mb-7 grid grid-cols-1 gap-4">
+        <article className="overflow-hidden rounded-lg border border-[#f2d8d8] bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-[#f2d8d8] bg-[#fffafa] px-5 py-4">
+            <div className="flex items-center gap-2">
+              <CircleAlert className="size-4 text-[#eb5757]" aria-hidden="true" />
+              <h2 className="m-0 text-sm font-bold text-[#092b5a]">Cobranças em atraso</h2>
+            </div>
+            <span className="rounded-full bg-[#feeeee] px-2.5 py-1 text-[10px] font-bold text-[#c54141]">{financeiro.emAtraso.length} pendente(s)</span>
+          </div>
+          {financeiro.emAtraso.length === 0 ? (
+            <EstadoVazio>Nenhuma cobrança vencida registrada.</EstadoVazio>
+          ) : (
+            <ul className="m-0 max-h-[220px] divide-y divide-[#eef1f4] overflow-y-auto p-0">
+              {financeiro.emAtraso.map((item) => (
+                <li key={item.idCobranca} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <strong className="block text-xs text-[#092b5a]">{item.inquilino}</strong>
+                    <span className="mt-1 block text-[11px] text-[#748196]">{item.imovel} · venceu {formatarData(item.dataVencimento)}</span>
+                  </div>
+                  <strong className="block text-xs text-[#eb5757]">{formatarMoeda(item.valor)}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
       </section>
 
       {financeiro.aReceber.length === 0 && financeiro.emAtraso.length === 0 && financeiro.manutencoesRecentes.length === 0 && (

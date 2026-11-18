@@ -328,7 +328,7 @@ export function Contratos() {
                     <p className="mt-2 mb-[19px] text-xs text-[#748196]">Clique acima para registrar o primeiro contrato.</p>
                 </section>
             ) : (
-                <div className="overflow-x-auto rounded-[9px] border border-[#e8edf2] bg-white shadow-sm">
+                <div className="max-h-[70vh] overflow-x-auto overflow-y-auto rounded-[9px] border border-[#e8edf2] bg-white shadow-sm">
                     <table className="w-full text-left text-sm text-[#46566b]">
                         <thead className="bg-[#f6f8fa] text-xs uppercase text-[#092b5a]">
                             <tr>
